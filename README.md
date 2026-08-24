@@ -118,8 +118,9 @@ npm run dev
 ```
 
 Open <http://localhost:3000>, tap **Start a crew**, and pick a name, your name
-and a PIN. You'll land on the plan picker. Your crew's six-character invite
-code is on the **Crew** tab — that's what you send your friends.
+and a PIN. To bring friends in, hit **Invite someone** on the Crew tab — it
+sends a link that drops them straight onto a join screen. There is still a
+six-character code behind it for reading down a phone, but nobody has to.
 
 ---
 

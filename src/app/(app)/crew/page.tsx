@@ -267,7 +267,7 @@ export default async function CrewPage() {
         </Link>
       )}
 
-      <InviteCode code={crew.invite_code} />
+      <InviteCode code={crew.invite_code} crewName={crew.name} />
 
       <section>
         <h2 className="label">Today</h2>
