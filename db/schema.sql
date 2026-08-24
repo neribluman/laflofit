@@ -1,0 +1,161 @@
+-- LaFloFit schema, for a plain Postgres database (Neon).
+-- You do not need to run this by hand: `npm run db:setup` does it for you.
+-- Safe to run more than once.
+
+-- ---------------------------------------------------------------------------
+-- Crews and people
+--
+-- One person belongs to exactly one crew. That is a deliberate simplification:
+-- it makes signing in "crew code + your name + your PIN" with no email at all.
+-- ---------------------------------------------------------------------------
+
+create table if not exists crews (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  invite_code text not null unique,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists users (
+  id             uuid primary key default gen_random_uuid(),
+  crew_id        uuid not null references crews(id) on delete cascade,
+  display_name   text not null,
+  -- scrypt, as "salt:hash". Never the PIN itself.
+  pin_hash       text not null,
+  emoji          text not null default '💪',
+  units          text not null default 'metric',
+  -- IANA name, e.g. 'Asia/Jerusalem'. Decides when "today" rolls over for you,
+  -- so friends in different countries each get their own midnight.
+  timezone       text not null default 'UTC',
+  active_plan_id uuid,
+  -- Four digits is easy to guess if you are allowed unlimited attempts.
+  failed_attempts int not null default 0,
+  locked_until   timestamptz,
+  created_at     timestamptz not null default now()
+);
+
+-- Two people in the same crew cannot share a name, because the name is how you
+-- pick yourself at the sign-in screen.
+create unique index if not exists users_crew_name_idx
+  on users (crew_id, lower(display_name));
+
+-- ---------------------------------------------------------------------------
+-- Plans: a named set of rules. Slow-carb is just one instance of this.
+-- ---------------------------------------------------------------------------
+
+create table if not exists plans (
+  id          uuid primary key default gen_random_uuid(),
+  crew_id     uuid references crews(id) on delete cascade,  -- null = personal
+  owner_id    uuid references users(id) on delete set null,
+  name        text not null,
+  description text,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists plan_rules (
+  id         uuid primary key default gen_random_uuid(),
+  plan_id    uuid not null references plans(id) on delete cascade,
+  label      text not null,
+  -- 'do'    tick it when you did the good thing        (ate protein at breakfast)
+  -- 'avoid' tick it when you successfully stayed off it (no white carbs)
+  -- 'count' enter a number, target is the goal          (litres of water >= 3)
+  kind       text not null default 'do',
+  unit       text,
+  target     numeric,
+  -- 'daily' scores every day. 'weekly' is an allowance you spend once a week,
+  -- which is how slow-carb's cheat day works.
+  cadence    text not null default 'daily',
+  points     int  not null default 1,
+  sort_order int  not null default 0
+);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'users_active_plan_id_fkey'
+  ) then
+    alter table users
+      add constraint users_active_plan_id_fkey
+      foreign key (active_plan_id) references plans(id) on delete set null;
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- The daily log
+-- ---------------------------------------------------------------------------
+
+create table if not exists day_logs (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  log_date   date not null,
+  plan_id    uuid references plans(id) on delete set null,
+  note       text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, log_date)
+);
+
+create table if not exists rule_entries (
+  day_log_id uuid not null references day_logs(id) on delete cascade,
+  rule_id    uuid not null references plan_rules(id) on delete cascade,
+  checked    boolean,
+  value      numeric,
+  primary key (day_log_id, rule_id)
+);
+
+create table if not exists workouts (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references users(id) on delete cascade,
+  workout_date date not null,
+  kind         text not null,
+  minutes      int,
+  intensity    text not null default 'moderate',
+  notes        text,
+  created_at   timestamptz not null default now()
+);
+
+create table if not exists measurements (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  measured_on date not null,
+  -- Always stored in kg and cm, converted for display. Keeps the maths sane
+  -- when two friends use different units.
+  weight_kg   numeric,
+  body_fat    numeric,
+  waist_cm    numeric,
+  notes       text,
+  created_at  timestamptz not null default now(),
+  unique (user_id, measured_on)
+);
+
+-- ---------------------------------------------------------------------------
+-- Accountability: cheering and heckling
+-- ---------------------------------------------------------------------------
+
+create table if not exists reactions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  target_type text not null,   -- 'day_log' | 'workout'
+  target_id   uuid not null,
+  emoji       text not null,
+  created_at  timestamptz not null default now(),
+  unique (user_id, target_type, target_id, emoji)
+);
+
+create table if not exists comments (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  target_type text not null,
+  target_id   uuid not null,
+  body        text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists day_logs_user_date_idx     on day_logs (user_id, log_date desc);
+create index if not exists workouts_user_date_idx     on workouts (user_id, workout_date desc);
+create index if not exists measurements_user_date_idx on measurements (user_id, measured_on desc);
+create index if not exists reactions_target_idx       on reactions (target_type, target_id);
+create index if not exists comments_target_idx        on comments (target_type, target_id);
+create index if not exists plan_rules_plan_idx        on plan_rules (plan_id, sort_order);
+create index if not exists users_crew_idx             on users (crew_id);

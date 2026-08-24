@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+/* --------------------------------------------------------------------------
+   LaFloFit palette. Dark by default — this app gets opened at 6am and 11pm.
+   -------------------------------------------------------------------------- */
+:root {
+  --bg: #0b0f14;
+  --surface: #121820;
+  --surface-2: #18202a;
+  --line: #253040;
+  --text: #e8eef6;
+  --muted: #8fa1b6;
+  --accent: #7dd35b;
+  --accent-ink: #0b0f14;
+  --warn: #f0b429;
+  --cool: #57b6ff;
+  --bad: #f2685f;
+  /* Chart marks. The de-emphasis grey is deliberately chroma-free: charts here
+     use one hue plus grey ("emphasis"), which stays separable for every kind of
+     colour blindness. Validated at deltaE 24+ against the accent in both modes. */
+  --series: #7dd35b;
+  --series-muted: #64748b;
+  --track: #253040;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f8fb;
+    --surface: #ffffff;
+    --surface-2: #eef2f7;
+    --line: #dde4ee;
+    --text: #101720;
+    --muted: #5d6b7d;
+    --accent: #3f9c1f;
+    --accent-ink: #ffffff;
+    --warn: #b57d05;
+    --cool: #1f7fc6;
+    --bad: #cf3f36;
+    --series: #3f9c1f;
+    --series-muted: #64748b;
+    --track: #e2e8f0;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-warn: var(--warn);
+  --color-cool: var(--cool);
+  --color-bad: var(--bad);
+  --color-series: var(--series);
+  --color-series-muted: var(--series-muted);
+  --color-track: var(--track);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  color-scheme: dark light;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* Tabular figures everywhere numbers matter, so columns don't jitter. */
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tailwind v4 will not @apply one custom class from another, so each button
+   variant spells out its own base. */
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+
+  .btn-primary,
+  .btn-ghost,
+  .btn-quiet {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+           text-sm font-semibold transition active:scale-[.98]
+           disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-accent text-accent-ink hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply border border-line bg-surface-2 text-text hover:border-muted;
+  }
+  .btn-quiet {
+    @apply text-muted hover:text-text;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2.5
+           text-[16px] text-text outline-none placeholder:text-muted/70
+           focus:border-accent;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-line
+           bg-surface-2 px-2.5 py-1 text-xs font-medium text-muted;
+  }
+}

@@ -1,0 +1,45 @@
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+
+let cached: NeonQueryFunction<false, false> | null = null;
+
+function client() {
+  if (!cached) {
+    // Vercel injects DATABASE_URL when you add Neon from the dashboard; the
+    // POSTGRES_URL fallback covers older integrations.
+    const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+    if (!url) {
+      throw new Error(
+        "DATABASE_URL is not set. Copy .env.example to .env.local and paste in " +
+          "your Neon connection string, then run `npm run db:setup`.",
+      );
+    }
+    cached = neon(url);
+  }
+  return cached;
+}
+
+/**
+ * Tagged-template query. Values are always sent as bound parameters, never
+ * pasted into the SQL, so there is no way to inject through them.
+ *
+ *   const rows = await sql<User>`select * from users where id = ${id}`
+ *
+ * Note: Postgres hands back `numeric` as a string and `date` as a Date object,
+ * so queries in this project cast them (`::float8`, `::text`) to get plain
+ * numbers and YYYY-MM-DD strings out.
+ */
+export async function sql<T = Record<string, unknown>>(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): Promise<T[]> {
+  return (await client()(strings, ...values)) as T[];
+}
+
+/** First row, or null. */
+export async function sqlOne<T = Record<string, unknown>>(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): Promise<T | null> {
+  const rows = await sql<T>(strings, ...values);
+  return rows[0] ?? null;
+}

@@ -1,0 +1,305 @@
+import { redirect } from "next/navigation";
+import {
+  commentsFor,
+  crewById,
+  crewRoster,
+  currentUser,
+  dayLogsBetween,
+  entriesForLogs,
+  measurementsFor,
+  reactionsFor,
+  rulesForPlans,
+  workoutsBetween,
+} from "@/lib/data";
+import { addDays, prettyDate, todayIn } from "@/lib/dates";
+import { currentStreak, scoreDay } from "@/lib/scoring";
+import { kgToDisplay, weightUnit } from "@/lib/units";
+import type { PlanRule } from "@/lib/types";
+import LeaderBars, { type LeaderRow } from "@/components/LeaderBars";
+import Reactions from "@/components/Reactions";
+import CommentBox from "@/components/CommentBox";
+import InviteCode from "./InviteCode";
+
+type FeedItem = {
+  key: string;
+  type: "day_log" | "workout";
+  id: string;
+  userId: string;
+  date: string;
+  headline: string;
+  detail?: string;
+};
+
+export default async function CrewPage() {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+
+  const crew = await crewById(user.crew_id);
+  if (!crew) redirect("/login");
+
+  const today = todayIn(user.timezone);
+  const weekAgo = addDays(today, -6);
+  const monthAgo = addDays(today, -29);
+
+  const roster = await crewRoster(crew.id);
+  const ids = roster.map((member) => member.id);
+
+  const [logs, workouts, measurements] = await Promise.all([
+    dayLogsBetween(ids, monthAgo, today),
+    workoutsBetween(ids, monthAgo, today),
+    measurementsFor(ids),
+  ]);
+
+  // Everyone can be on a different plan, so score each log against its own rules.
+  const planIds = [
+    ...new Set(
+      [
+        ...roster.map((member) => member.active_plan_id),
+        ...logs.map((log) => log.plan_id),
+      ].filter((value): value is string => Boolean(value)),
+    ),
+  ];
+
+  const [allRules, entries] = await Promise.all([
+    rulesForPlans(planIds),
+    entriesForLogs(logs.map((log) => log.id)),
+  ]);
+
+  const rulesByPlan = new Map<string, PlanRule[]>();
+  for (const rule of allRules) {
+    rulesByPlan.set(rule.plan_id, [...(rulesByPlan.get(rule.plan_id) ?? []), rule]);
+  }
+
+  const entriesByLog = new Map<string, typeof entries>();
+  for (const entry of entries) {
+    entriesByLog.set(entry.day_log_id, [
+      ...(entriesByLog.get(entry.day_log_id) ?? []),
+      entry,
+    ]);
+  }
+
+  // ---- Leaderboard: last 7 days ------------------------------------------
+  const rows: LeaderRow[] = roster
+    .map((member) => {
+      const theirs = logs.filter((log) => log.user_id === member.id);
+      const perfectByDate = new Map<string, boolean>();
+      let sum = 0;
+
+      for (const log of theirs) {
+        const rules =
+          rulesByPlan.get(log.plan_id ?? member.active_plan_id ?? "") ?? [];
+        const score = scoreDay(rules, entriesByLog.get(log.id) ?? [], true);
+        perfectByDate.set(log.log_date, score.perfect);
+        if (log.log_date >= weekAgo) sum += score.ratio;
+      }
+
+      const sessions = workouts.filter(
+        (workout) =>
+          workout.user_id === member.id && workout.workout_date >= weekAgo,
+      ).length;
+      const streak = currentStreak(today, perfectByDate);
+
+      return {
+        id: member.id,
+        name: member.display_name,
+        emoji: member.emoji,
+        ratio: sum / 7,
+        detail: `${sessions} workout${sessions === 1 ? "" : "s"} · ${
+          streak > 0 ? `${streak}-day streak` : "no streak"
+        }`,
+        isMe: member.id === user.id,
+      };
+    })
+    .sort((a, b) => b.ratio - a.ratio);
+
+  // ---- Weight movement over 30 days --------------------------------------
+  const movement = roster
+    .map((member) => {
+      const theirs = measurements.filter(
+        (m) =>
+          m.user_id === member.id &&
+          m.weight_kg != null &&
+          m.measured_on >= monthAgo,
+      );
+      if (theirs.length < 2) return null;
+      const deltaKg = theirs[theirs.length - 1].weight_kg! - theirs[0].weight_kg!;
+      return { member, delta: kgToDisplay(deltaKg, user.units) };
+    })
+    .filter((value): value is NonNullable<typeof value> => value !== null);
+
+  // ---- Feed ---------------------------------------------------------------
+  const feedFrom = addDays(today, -9);
+  const byId = new Map(roster.map((member) => [member.id, member]));
+
+  const feed: FeedItem[] = [
+    ...logs
+      .filter((log) => log.log_date >= feedFrom)
+      .map((log) => {
+        const rules =
+          rulesByPlan.get(
+            log.plan_id ?? byId.get(log.user_id)?.active_plan_id ?? "",
+          ) ?? [];
+        const score = scoreDay(rules, entriesByLog.get(log.id) ?? [], true);
+        return {
+          key: `day_log:${log.id}`,
+          type: "day_log" as const,
+          id: log.id,
+          userId: log.user_id,
+          date: log.log_date,
+          headline: score.perfect
+            ? "nailed a perfect day"
+            : `hit ${Math.round(score.ratio * 100)}% of the plan`,
+          detail: log.note ?? undefined,
+        };
+      }),
+    ...workouts
+      .filter((workout) => workout.workout_date >= feedFrom)
+      .map((workout) => ({
+        key: `workout:${workout.id}`,
+        type: "workout" as const,
+        id: workout.id,
+        userId: workout.user_id,
+        date: workout.workout_date,
+        headline: `trained — ${workout.kind}${
+          workout.minutes ? `, ${workout.minutes} min` : ""
+        }`,
+        detail: workout.notes ?? undefined,
+      })),
+  ]
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .slice(0, 40);
+
+  const targetIds = feed.map((item) => item.id);
+  const [reactionRows, commentRows] = await Promise.all([
+    reactionsFor(targetIds),
+    commentsFor(targetIds),
+  ]);
+
+  const reactionsBy = new Map<string, typeof reactionRows>();
+  for (const reaction of reactionRows) {
+    reactionsBy.set(reaction.target_id, [
+      ...(reactionsBy.get(reaction.target_id) ?? []),
+      reaction,
+    ]);
+  }
+  const commentsBy = new Map<string, typeof commentRows>();
+  for (const comment of commentRows) {
+    commentsBy.set(comment.target_id, [
+      ...(commentsBy.get(comment.target_id) ?? []),
+      comment,
+    ]);
+  }
+
+  return (
+    <main className="space-y-8">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">{crew.name}</h1>
+        <p className="mt-1 text-sm text-muted">
+          {roster.length} member{roster.length === 1 ? "" : "s"}
+        </p>
+      </header>
+
+      <InviteCode code={crew.invite_code} />
+
+      <section>
+        <h2 className="label">Last 7 days</h2>
+        <div className="card p-4">
+          <LeaderBars rows={rows} />
+          <p className="mt-4 text-xs text-muted">
+            Share of plan rules met, averaged over seven days. A day never logged
+            counts as zero — that is rather the point.
+          </p>
+        </div>
+      </section>
+
+      {movement.length > 0 && (
+        <section>
+          <h2 className="label">30-day weight change</h2>
+          <ul className="card divide-y divide-line">
+            {movement.map(({ member, delta }) => (
+              <li
+                key={member.id}
+                className="flex items-center gap-3 px-4 py-3 text-sm"
+              >
+                <span aria-hidden>{member.emoji}</span>
+                <span className="flex-1 truncate">{member.display_name}</span>
+                <span className="nums font-semibold">
+                  {delta > 0 ? "+" : ""}
+                  {delta.toFixed(1)} {weightUnit(user.units)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h2 className="label">What everyone&apos;s been up to</h2>
+        {feed.length === 0 ? (
+          <p className="card p-4 text-sm text-muted">
+            Quiet in here. Be the first to log something.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {feed.map((item) => {
+              const who = byId.get(item.userId);
+              const reactions = reactionsBy.get(item.id) ?? [];
+              const counts: Record<string, number> = {};
+              for (const reaction of reactions) {
+                counts[reaction.emoji] = (counts[reaction.emoji] ?? 0) + 1;
+              }
+              const comments = commentsBy.get(item.id) ?? [];
+
+              return (
+                <li key={item.key} className="card p-4">
+                  <div className="flex items-baseline gap-2">
+                    <span aria-hidden>{who?.emoji ?? "•"}</span>
+                    <p className="min-w-0 flex-1 text-sm">
+                      <span className="font-semibold">
+                        {who?.display_name ?? "Someone"}
+                      </span>{" "}
+                      <span className="text-muted">{item.headline}</span>
+                    </p>
+                    <span className="shrink-0 text-xs text-muted">
+                      {prettyDate(item.date, today)}
+                    </span>
+                  </div>
+
+                  {item.detail && (
+                    <p className="mt-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
+                      {item.detail}
+                    </p>
+                  )}
+
+                  <Reactions
+                    targetType={item.type}
+                    targetId={item.id}
+                    counts={counts}
+                    mine={reactions
+                      .filter((reaction) => reaction.user_id === user.id)
+                      .map((reaction) => reaction.emoji)}
+                  />
+
+                  {comments.length > 0 && (
+                    <ul className="mt-2 space-y-1.5">
+                      {comments.map((comment) => (
+                        <li key={comment.id} className="text-sm">
+                          <span className="font-medium">
+                            {byId.get(comment.user_id)?.display_name ?? "Someone"}
+                          </span>{" "}
+                          <span className="text-muted">{comment.body}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <CommentBox targetType={item.type} targetId={item.id} />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </main>
+  );
+}
