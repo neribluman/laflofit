@@ -130,10 +130,13 @@ export default async function TodayPage({
   // An untouched day shows nothing but the box. Everything else appears once
   // there is something to show — or when someone asks for it explicitly,
   // because typing shouldn't be the only way in.
+  //
+  // A weigh-in deliberately does not count. Mentioning your weight at sign-up
+  // records one for today, and that is not the same as having logged your day
+  // — counting it meant everybody's first day opened fully expanded.
   const hasContent =
     meals.length > 0 ||
     workouts.length > 0 ||
-    todayWeight?.weight_kg != null ||
     Boolean(todayLog?.note) ||
     todayEntries.some((e) => e.checked != null || e.value != null);
   const showAll = hasContent || show === "all" || !canInterpret();
