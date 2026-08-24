@@ -203,20 +203,8 @@ export default async function TodayPage({
               weightUnit={weightUnit(user.units)}
               distanceUnit={distanceUnit(user.units)}
               prominent={!showAll}
+              fallbackHref={showAll ? undefined : `/today?d=${date}&show=all`}
             />
-          )}
-
-          {!showAll && (
-            <p className="text-center text-sm text-muted">
-              Or{" "}
-              <Link
-                href={`/today?d=${date}&show=all`}
-                className="font-medium text-accent"
-              >
-                fill it in yourself
-              </Link>{" "}
-              instead.
-            </p>
           )}
 
           {/* These two hold local state seeded from the day's row, so the key

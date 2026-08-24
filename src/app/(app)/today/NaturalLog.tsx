@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { readDay, applyDay, type ReadResult } from "./actions";
 import type { DayReport } from "@/lib/interpret";
 import { macroTotals } from "@/lib/macros";
@@ -14,18 +15,31 @@ export default function NaturalLog({
   weightUnit,
   distanceUnit,
   prominent = false,
+  fallbackHref,
 }: {
   date: string;
   weightUnit: string;
   distanceUnit: string;
   /** On an untouched day this box is the whole screen, so give it room. */
   prominent?: boolean;
+  /** Shown under the box while composing, and hidden once there's a result. */
+  fallbackHref?: string;
 }) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<ReadResult | null>(null);
   const [applied, setApplied] = useState(false);
   const [reading, startReading] = useTransition();
   const [applying, startApplying] = useTransition();
+  const reviewRef = useRef<HTMLDivElement>(null);
+
+  // Once there's something to check, put it in front of them. Otherwise the
+  // result lands below the fold and the page looks like nothing happened.
+  const reviewing = result?.ok === true;
+  useEffect(() => {
+    if (reviewing) {
+      reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [reviewing]);
 
   const read = () =>
     startReading(async () => {
@@ -53,6 +67,45 @@ export default function NaturalLog({
     );
   }
 
+  // While reviewing, what they wrote collapses to a quiet line with a way back
+  // to it. Two big green buttons on screen at once is the whole problem.
+  if (reviewing && result?.ok) {
+    return (
+      <div className="card p-4" ref={reviewRef}>
+        <div className="flex items-start gap-3">
+          <p className="min-w-0 flex-1 text-sm text-muted">
+            <span className="line-clamp-2 italic">&ldquo;{text}&rdquo;</span>
+          </p>
+          <button
+            onClick={() => setResult(null)}
+            className="btn-quiet shrink-0 px-2 py-1 text-xs"
+          >
+            Edit
+          </button>
+        </div>
+
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="label mb-0">Here&apos;s what I got</p>
+          <p className="mt-0.5 mb-3 text-xs text-muted">
+            Check it over — nothing is saved until you log it.
+          </p>
+          <Preview
+            report={result.report}
+            labels={result.labels}
+            weightUnit={weightUnit}
+            distanceUnit={distanceUnit}
+            applying={applying}
+            onApply={() => apply(result.report)}
+            onDiscard={() => {
+              setResult(null);
+              setText("");
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card p-4">
       <label className="label" htmlFor="day-text">
@@ -70,7 +123,7 @@ export default function NaturalLog({
 
       {reading && (
         <div className="mt-3 space-y-2" aria-live="polite">
-          <p className="text-sm text-muted">Reading your day…</p>
+          <p className="text-sm text-muted">Analysing your day…</p>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -87,7 +140,7 @@ export default function NaturalLog({
           disabled={reading || text.trim().length < 3}
           className="btn-primary flex-1"
         >
-          {reading ? "Reading…" : "Read my day"}
+          {reading ? "Analysing…" : "Analyse my day"}
         </button>
         {text.length === 0 && (
           <button
@@ -104,21 +157,20 @@ export default function NaturalLog({
         Food, training, weight, how it went — all of it, in one go.
       </p>
 
+      {fallbackHref && (
+        <p className="mt-3 text-center text-sm text-muted">
+          Or{" "}
+          <Link href={fallbackHref} className="font-medium text-accent">
+            fill it in yourself
+          </Link>{" "}
+          instead.
+        </p>
+      )}
+
       {result && !result.ok && (
         <p className="mt-3 text-sm text-bad">{result.error}</p>
       )}
 
-      {result?.ok && (
-        <Preview
-          report={result.report}
-          labels={result.labels}
-          weightUnit={weightUnit}
-          distanceUnit={distanceUnit}
-          applying={applying}
-          onApply={() => apply(result.report)}
-          onDiscard={() => setResult(null)}
-        />
-      )}
     </div>
   );
 }
@@ -148,8 +200,7 @@ function Preview({
     report.weight == null;
 
   return (
-    <div className="mt-4 border-t border-line pt-4">
-      <p className="label">Here&apos;s what I got</p>
+    <div>
 
       {nothing && (
         <p className="text-sm text-muted">
@@ -255,9 +306,9 @@ function Preview({
       {!nothing && (
         <div className="mt-4 flex gap-2">
           <button onClick={onApply} disabled={applying} className="btn-primary flex-1">
-            {applying ? "Logging…" : "Log all this"}
+            {applying ? "Logging…" : "Log this"}
           </button>
-          <button onClick={onDiscard} className="btn-ghost">
+          <button onClick={onDiscard} className="btn-quiet px-3">
             Discard
           </button>
         </div>
