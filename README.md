@@ -141,6 +141,65 @@ being careful with.
 
 ---
 
+## Putting it on your own domain
+
+Two ways, and they are not equally fiddly.
+
+### A sub-domain — `laflofit.laflo.pro`
+
+Nothing to configure in the code. In this project's Vercel settings, **Domains
+→ Add**, enter the sub-domain, and add the DNS record Vercel shows you. Done.
+
+### A sub-path — `laflo.pro/laflofit`
+
+Use this when you want one domain and the root already has something else on
+it. It needs both projects to cooperate, because two Vercel projects cannot
+serve the same domain: the site that owns `laflo.pro` has to forward the
+sub-path to this app.
+
+**1. Build this app under the sub-path.** In this project's Vercel settings,
+add an environment variable:
+
+```
+BASE_PATH=/laflofit
+```
+
+Every URL the app generates then starts with `/laflofit` — pages, assets,
+form submissions — and the login cookie scopes itself to that path so the
+rest of `laflo.pro` never receives it. Redeploy after adding it.
+
+**2. Forward the path from the site that owns the domain.** In *that*
+project (not this one), add to its `vercel.json`:
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/laflofit/:path*",
+      "destination": "https://YOUR-LAFLOFIT-PROJECT.vercel.app/laflofit/:path*"
+    }
+  ]
+}
+```
+
+Replace the destination with this project's own Vercel URL. Deploy that
+project, and `laflo.pro/laflofit` will serve the app.
+
+Note what this costs you: every request goes through the other project first,
+and the two are now coupled — the rewrite has to keep pointing at a URL this
+project still answers on. The sub-domain has none of that. Worth choosing the
+sub-path only because you actually want the single domain.
+
+To run the sub-path locally:
+
+```bash
+BASE_PATH=/laflofit npm run dev
+```
+
+then open <http://localhost:3000/laflofit>.
+
+---
+
 ## Where things live
 
 ```

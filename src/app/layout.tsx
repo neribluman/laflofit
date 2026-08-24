@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "LaFloFit",
   description: "Track the diet. Log the training. Answer to your friends.",
-  manifest: "/manifest.webmanifest",
+  manifest: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/manifest.webmanifest`,
   appleWebApp: { capable: true, title: "LaFloFit", statusBarStyle: "black-translucent" },
 };
 
