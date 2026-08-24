@@ -26,6 +26,7 @@ import TrendLine from "@/components/TrendLine";
 import { deleteMeasurement, deleteWorkout, signOut, updateProfile } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
 import BiomarkerForm from "./BiomarkerForm";
+import ProfileFields from "@/components/ProfileFields";
 import BiomarkerGrid from "./BiomarkerGrid";
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -114,11 +115,7 @@ export default async function MePage() {
 
       <section className="space-y-2.5">
         <h2 className="label mb-0">Biomarkers</h2>
-        <BiomarkerGrid
-          measurements={measurements}
-          units={user.units}
-          heightCm={user.height_cm}
-        />
+        <BiomarkerGrid measurements={measurements} user={user} today={today} />
         <BiomarkerForm
           date={today}
           units={user.units}
@@ -260,6 +257,27 @@ export default async function MePage() {
             })}
           </ul>
         )}
+      </section>
+
+      <section>
+        <h2 className="label">About you</h2>
+        {user.about ? (
+          <p className="card mb-2.5 p-4 text-sm">{user.about}</p>
+        ) : (
+          <p className="card mb-2.5 p-4 text-sm text-muted">
+            Nothing on file yet. What you put here is read every time your day
+            is analysed, so portions and effort are judged against you rather
+            than an average person.
+          </p>
+        )}
+        <details className="card p-4">
+          <summary className="cursor-pointer text-sm font-medium text-muted">
+            Edit your details
+          </summary>
+          <div className="mt-4">
+            <ProfileFields user={user} today={today} />
+          </div>
+        </details>
       </section>
 
       <section>

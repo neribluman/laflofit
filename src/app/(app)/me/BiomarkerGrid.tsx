@@ -1,5 +1,6 @@
 import { cmToDisplay, kgToDisplay, lengthUnit, weightUnit } from "@/lib/units";
-import type { Measurement, Units } from "@/lib/types";
+import { ageFrom, energyEstimate } from "@/lib/profile";
+import type { Measurement, User } from "@/lib/types";
 
 function Tile({
   label,
@@ -24,13 +25,15 @@ function Tile({
 /** Latest reading of each biomarker — each taken from the most recent entry that has one. */
 export default function BiomarkerGrid({
   measurements,
-  units,
-  heightCm,
+  user,
+  today,
 }: {
   measurements: Measurement[];
-  units: Units;
-  heightCm: number | null;
+  user: User;
+  today: string;
 }) {
+  const units = user.units;
+  const heightCm = user.height_cm;
   // Entries are oldest-first; the newest non-null wins for each marker.
   const latest = <K extends keyof Measurement>(key: K) => {
     for (let i = measurements.length - 1; i >= 0; i -= 1) {
@@ -49,6 +52,14 @@ export default function BiomarkerGrid({
     weight && heightCm && heightCm > 0
       ? weight.value / (heightCm / 100) ** 2
       : null;
+
+  const energy = energyEstimate({
+    weightKg: weight?.value ?? null,
+    heightCm,
+    age: ageFrom(user.birth_year, today),
+    sex: user.sex,
+    activity: user.activity_level,
+  });
 
   const tiles = [
     weight && {
@@ -72,13 +83,27 @@ export default function BiomarkerGrid({
       label: "Height",
       value: `${cmToDisplay(heightCm, units).toFixed(1)} ${lengthUnit(units)}`,
     },
+    user.goal_weight_kg && {
+      label: "Goal",
+      value: `${kgToDisplay(user.goal_weight_kg, units).toFixed(1)} ${weightUnit(units)}`,
+      sub:
+        weight
+          ? `${Math.abs(kgToDisplay(weight.value - user.goal_weight_kg, units)).toFixed(1)} to go`
+          : undefined,
+    },
+    energy && {
+      label: "Maintenance",
+      value: `${energy.maintenance.toLocaleString()} kcal`,
+      sub: `at rest ${energy.bmr.toLocaleString()}`,
+    },
   ].filter(Boolean) as { label: string; value: string; sub?: string }[];
 
   if (tiles.length === 0) {
     return (
       <p className="card p-4 text-sm text-muted">
-        Nothing measured yet. Add your first entry below — weight and height are
-        enough to get a BMI.
+        Nothing measured yet. Add your first entry below — weight and height
+        are enough for a BMI, and adding your age and sex gets you a
+        maintenance-calorie estimate too.
       </p>
     );
   }

@@ -131,6 +131,8 @@ Capture everything they gave you. There are two separate jobs, and the second do
 
    Intensity: take their word for it — "felt easy", "brutal", "tough". Default to moderate when they say nothing.
 
+When you are told about them — their size, age, how much they train, what they don't eat — use it. A portion is judged against the person eating it, and a session against the person doing it. If what they wrote contradicts what you know about them (a vegetarian describing steak), log what they wrote and note the contradiction in unclear rather than silently correcting either one.
+
 Never invent food they didn't mention. Estimating the size of something they did mention is expected; inventing a meal is not. Use "unclear" only for things you could not act on at all.`;
 
 export async function interpretDay({
@@ -138,11 +140,14 @@ export async function interpretDay({
   rules,
   units,
   alreadyLogged,
+  person,
 }: {
   text: string;
   rules: PlanRule[];
   units: Units;
   alreadyLogged: string[];
+  /** One line about who they are, so portions and effort are judged in scale. */
+  person?: string;
 }): Promise<DayReport> {
   const client = new Anthropic();
 
@@ -166,6 +171,7 @@ export async function interpretDay({
       {
         role: "user",
         content: [
+          person ? `About them: ${person}\n` : "",
           `Their plan's rules:\n${JSON.stringify(ruleSheet, null, 1)}`,
           alreadyLogged.length
             ? `\nAlready ticked today: ${alreadyLogged.join(", ")}`
@@ -183,4 +189,70 @@ export async function interpretDay({
   // The model can only ever write to rules that exist on this plan.
   const known = new Set(rules.map((rule) => rule.id));
   return { ...parsed, rules: parsed.rules.filter((r) => known.has(r.rule_id)) };
+}
+
+// ---------------------------------------------------------------------------
+// Who they are
+// ---------------------------------------------------------------------------
+
+const ProfileReport = z.object({
+  age: z.number().nullable().describe("in years, if they said or implied it"),
+  sex: z
+    .enum(["male", "female", "other"])
+    .nullable()
+    .describe("only if they actually said; never inferred from a name"),
+  height: z.number().nullable().describe("in the units they used"),
+  weight: z.number().nullable().describe("current weight, in their units"),
+  goal_weight: z.number().nullable().describe("target weight, in their units"),
+  activity_level: z
+    .enum(["sedentary", "light", "moderate", "very"])
+    .nullable()
+    .describe("how much they move in a normal week"),
+  about: z
+    .string()
+    .describe(
+      "everything else worth remembering, in one or two sentences: goals, dietary restrictions, injuries, what they are training for. Empty string if there is nothing.",
+    ),
+  unclear: z.array(z.string()),
+});
+
+export type ProfileReport = z.infer<typeof ProfileReport>;
+
+const PROFILE_SYSTEM = `You turn a short self-description into a profile for a diet and training tracker.
+
+The numbers matter because they calibrate everything else: portion estimates, calorie maths, whether a session sounds hard for this person.
+
+- Take only what they give you. Someone who mentions no weight has no weight — do not reach for an average.
+- Never infer sex from a name, a sport, or a goal. Record it only if they state it.
+- Heights and weights come in whatever units they used; report the number as written and let the app convert.
+- "About" is for what the numbers cannot hold: what they are training for, injuries to work around, foods they do not eat, why they are doing this. Write it in the third person, plainly, as notes to be read later. Keep their meaning, drop the padding.
+- If they wrote something genuinely uninterpretable, put it in unclear rather than guessing.`;
+
+export async function interpretProfile({
+  text,
+  units,
+}: {
+  text: string;
+  units: Units;
+}): Promise<ProfileReport> {
+  const client = new Anthropic();
+
+  const response = await client.messages.parse({
+    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
+    max_tokens: 2000,
+    system: PROFILE_SYSTEM,
+    output_config: { effort: "low", format: zodOutputFormat(ProfileReport) },
+    messages: [
+      {
+        role: "user",
+        content: `They use ${weightUnit(units)} and ${
+          units === "imperial" ? "inches" : "centimetres"
+        }.\n\nWhat they wrote about themselves:\n"""\n${text}\n"""`,
+      },
+    ],
+  });
+
+  const parsed = response.parsed_output;
+  if (!parsed) throw new Error("Could not read that. Try rephrasing?");
+  return parsed;
 }

@@ -24,7 +24,8 @@ export async function currentUser(): Promise<User | null> {
   if (!id) return null;
   return sqlOne<User>`
     select id, crew_id, display_name, emoji, units, timezone,
-           height_cm::float8 as height_cm, active_plan_id,
+           height_cm::float8 as height_cm, birth_year, sex, activity_level,
+           goal_weight_kg::float8 as goal_weight_kg, about, active_plan_id,
            created_at::text as created_at
     from users where id = ${id}
   `;
@@ -47,7 +48,8 @@ export async function crewByCode(code: string): Promise<Crew | null> {
 export async function crewRoster(crewId: string): Promise<User[]> {
   return sql<User>`
     select id, crew_id, display_name, emoji, units, timezone,
-           height_cm::float8 as height_cm, active_plan_id,
+           height_cm::float8 as height_cm, birth_year, sex, activity_level,
+           goal_weight_kg::float8 as goal_weight_kg, about, active_plan_id,
            created_at::text as created_at
     from users
     where crew_id = ${crewId}

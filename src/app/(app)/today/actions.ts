@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sql, sqlOne } from "@/lib/db";
-import { currentUser, planWithRules } from "@/lib/data";
+import { currentUser, measurementsFor, planWithRules } from "@/lib/data";
 import { interpretDay, macroTotals, type DayReport } from "@/lib/interpret";
+import { describePerson } from "@/lib/profile";
 import { displayToKg, displayToKm } from "@/lib/units";
 import { WORKOUT_KINDS } from "@/lib/presets";
 import type { PlanRule, User } from "@/lib/types";
@@ -61,12 +62,17 @@ export async function readDay(date: string, text: string): Promise<ReadResult> {
     where d.user_id = ${user.id} and d.log_date = ${date}::date and re.checked = true
   `;
 
+  const weighIns = await measurementsFor([user.id]);
+  const latestWeight =
+    [...weighIns].reverse().find((m) => m.weight_kg != null)?.weight_kg ?? null;
+
   try {
     const report = await interpretDay({
       text: trimmed.slice(0, 2000),
       rules: planned.rules,
       units: user.units,
       alreadyLogged: logged.map((row) => row.label),
+      person: describePerson(user, latestWeight, date),
     });
     return {
       ok: true,

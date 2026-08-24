@@ -18,6 +18,11 @@ export type User = {
   units: Units;
   timezone: string;
   height_cm: number | null;
+  birth_year: number | null;
+  sex: "male" | "female" | "other" | null;
+  activity_level: "sedentary" | "light" | "moderate" | "very" | null;
+  goal_weight_kg: number | null;
+  about: string | null;
   active_plan_id: string | null;
   created_at: string;
 };

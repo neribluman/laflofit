@@ -223,3 +223,15 @@ create index if not exists users_crew_idx             on users (crew_id);
 alter table users add column if not exists height_cm numeric;
 
 alter table measurements add column if not exists resting_hr int;
+
+-- Who they are, for context rather than for scoring.
+--
+-- Birth year rather than age: age recomputes itself and never goes stale.
+-- All optional — someone who tells us nothing still gets a working app; the
+-- estimates are just vaguer.
+alter table users add column if not exists birth_year int;
+alter table users add column if not exists sex text;            -- 'male' | 'female' | 'other'
+alter table users add column if not exists activity_level text; -- 'sedentary' | 'light' | 'moderate' | 'very'
+alter table users add column if not exists goal_weight_kg numeric;
+-- Free-form: goals, dietary restrictions, injuries, anything worth knowing.
+alter table users add column if not exists about text;
