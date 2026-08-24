@@ -14,6 +14,7 @@ import ScoreRing from "@/components/ScoreRing";
 import WeekStrip, { type StripDay } from "@/components/WeekStrip";
 import CheckInList from "./CheckInList";
 import NaturalLog from "./NaturalLog";
+import ResetDay from "./ResetDay";
 import DayNote from "./DayNote";
 
 export default async function TodayPage({
@@ -132,6 +133,9 @@ export default async function TodayPage({
         <NaturalLog key={`log-${date}`} date={date} weightUnit={weightUnit(user.units)} />
       )}
 
+      {/* These two hold local state seeded from the day's row, so the key
+          carries that row's id: resetting the day deletes the row, the id
+          changes, and both remount clean instead of showing stale ticks. */}
       {rules.length === 0 ? (
         <div className="card p-6 text-center">
           <p className="text-sm text-muted">
@@ -142,7 +146,12 @@ export default async function TodayPage({
           </Link>
         </div>
       ) : (
-        <CheckInList date={date} rules={rules} entries={todayEntries} />
+        <CheckInList
+          key={`checks-${date}-${todayLog?.id ?? "empty"}`}
+          date={date}
+          rules={rules}
+          entries={todayEntries}
+        />
       )}
 
       {weeklyUsed.size > 0 && (
@@ -156,11 +165,17 @@ export default async function TodayPage({
         </ul>
       )}
 
-      <DayNote key={`note-${date}`} date={date} initial={todayLog?.note ?? ""} />
+      <DayNote
+        key={`note-${date}-${todayLog?.id ?? "empty"}`}
+        date={date}
+        initial={todayLog?.note ?? ""}
+      />
 
       <Link href="/log" className="btn-ghost w-full">
         Log a workout or a weigh-in →
       </Link>
+
+      <ResetDay date={date} label={prettyDate(date, today)} />
     </main>
   );
 }

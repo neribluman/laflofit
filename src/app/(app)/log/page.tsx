@@ -3,7 +3,12 @@ import { currentUser, measurementsFor, workoutsBetween } from "@/lib/data";
 import { addDays, prettyDate, todayIn } from "@/lib/dates";
 import { fmtWeight, cmToDisplay, lengthUnit, weightUnit } from "@/lib/units";
 import { WORKOUT_KINDS } from "@/lib/presets";
-import { addWorkout, deleteWorkout, saveMeasurement } from "../actions";
+import {
+  addWorkout,
+  deleteMeasurement,
+  deleteWorkout,
+  saveMeasurement,
+} from "../actions";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function LogPage() {
@@ -230,6 +235,14 @@ export default async function LogPage() {
                     {lengthUnit(user.units)}
                   </span>
                 )}
+                <form action={deleteMeasurement.bind(null, m.id)}>
+                  <button
+                    className="btn-quiet px-1 py-1 text-xs"
+                    aria-label={`Delete weigh-in from ${m.measured_on}`}
+                  >
+                    Delete
+                  </button>
+                </form>
               </li>
             ))}
           </ul>

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { sql, sqlOne } from "@/lib/db";
 import { currentUser } from "@/lib/data";
 import { endSession } from "@/lib/session";
-import { displayToCm, displayToKg } from "@/lib/units";
+import { displayToCm, displayToKg, kgToDisplay, weightUnit } from "@/lib/units";
 import type { User } from "@/lib/types";
 
 // There is no row-level security here the way there was on Supabase, so every
@@ -244,4 +244,96 @@ export async function updateProfile(formData: FormData) {
 export async function signOut() {
   await endSession();
   redirect("/login");
+}
+
+// ---------------------------------------------------------------------------
+// Deleting things
+// ---------------------------------------------------------------------------
+
+export type DaySummary = {
+  ticks: number;
+  hasNote: boolean;
+  workouts: { kind: string; minutes: number | null }[];
+  /** Already converted to the user's display units. */
+  weight: string | null;
+};
+
+/** What a reset would actually remove. Read-only — used to fill the warning. */
+export async function describeDay(date: string): Promise<DaySummary> {
+  const user = await requireUser();
+
+  const [ticks, note, workouts, weights] = await Promise.all([
+    sqlOne<{ n: number }>`
+      select count(*)::int as n from rule_entries re
+      join day_logs d on d.id = re.day_log_id
+      where d.user_id = ${user.id} and d.log_date = ${date}::date
+        and (re.checked is not null or re.value is not null)
+    `,
+    sqlOne<{ note: string | null }>`
+      select note from day_logs
+      where user_id = ${user.id} and log_date = ${date}::date
+    `,
+    sql<{ kind: string; minutes: number | null }>`
+      select kind, minutes from workouts
+      where user_id = ${user.id} and workout_date = ${date}::date
+      order by created_at
+    `,
+    sqlOne<{ weight_kg: number | null }>`
+      select weight_kg::float8 as weight_kg from measurements
+      where user_id = ${user.id} and measured_on = ${date}::date
+    `,
+  ]);
+
+  return {
+    ticks: ticks?.n ?? 0,
+    hasNote: Boolean(note?.note),
+    workouts,
+    weight:
+      weights?.weight_kg == null
+        ? null
+        : `${kgToDisplay(weights.weight_kg, user.units).toFixed(1)} ${weightUnit(user.units)}`,
+  };
+}
+
+/**
+ * Wipe one day back to never-logged: ticks, note, workouts and weigh-in.
+ * Reactions and comments are keyed by target id rather than a foreign key, so
+ * they have to be cleared by hand or they outlive what they were about.
+ */
+export async function resetDay(date: string) {
+  const user = await requireUser();
+
+  const logs = await sql<{ id: string }>`
+    delete from day_logs
+    where user_id = ${user.id} and log_date = ${date}::date
+    returning id
+  `;
+  const workouts = await sql<{ id: string }>`
+    delete from workouts
+    where user_id = ${user.id} and workout_date = ${date}::date
+    returning id
+  `;
+  await sql`
+    delete from measurements
+    where user_id = ${user.id} and measured_on = ${date}::date
+  `;
+
+  const orphans = [...logs, ...workouts].map((row) => row.id);
+  if (orphans.length > 0) {
+    await sql`delete from reactions where target_id = any(${orphans}::uuid[])`;
+    await sql`delete from comments  where target_id = any(${orphans}::uuid[])`;
+  }
+
+  revalidatePath("/today");
+  revalidatePath("/log");
+  revalidatePath("/crew");
+  revalidatePath("/me");
+}
+
+export async function deleteMeasurement(id: string) {
+  const user = await requireUser();
+  await sql`delete from measurements where id = ${id} and user_id = ${user.id}`;
+  revalidatePath("/log");
+  revalidatePath("/me");
+  revalidatePath("/crew");
 }
