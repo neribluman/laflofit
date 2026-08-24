@@ -76,6 +76,22 @@ export type Measurement = {
   notes: string | null;
 };
 
+export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack" | "drink";
+
+export type Meal = {
+  id: string;
+  user_id: string;
+  meal_date: string;
+  description: string;
+  slot: MealSlot | null;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  fibre_g: number | null;
+  estimated: boolean;
+};
+
 export type Comment = {
   id: string;
   user_id: string;

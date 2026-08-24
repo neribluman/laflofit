@@ -4,10 +4,27 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sql, sqlOne } from "@/lib/db";
 import { currentUser, planWithRules } from "@/lib/data";
-import { interpretDay, type DayReport } from "@/lib/interpret";
+import { interpretDay, macroTotals, type DayReport } from "@/lib/interpret";
 import { displayToKg } from "@/lib/units";
 import { WORKOUT_KINDS } from "@/lib/presets";
-import type { User } from "@/lib/types";
+import type { PlanRule, User } from "@/lib/types";
+
+const round = (value: number | null | undefined) =>
+  value == null || !Number.isFinite(value) ? null : Math.round(value);
+
+/** Which macro, if any, a "count" rule is really asking for. */
+function macroForRule(rule: PlanRule): keyof ReturnType<typeof macroTotals> | null {
+  const label = rule.label.toLowerCase();
+  const unit = (rule.unit ?? "").toLowerCase();
+  if (["kcal", "cal", "calories"].includes(unit) || label.includes("calorie")) {
+    return "calories";
+  }
+  if (label.includes("protein")) return "protein";
+  if (label.includes("carb")) return "carbs";
+  if (label.includes("fibre") || label.includes("fiber")) return "fibre";
+  if (label.includes("fat")) return "fat";
+  return null;
+}
 
 export type ReadResult =
   | { ok: true; report: DayReport; labels: Record<string, string> }
@@ -77,7 +94,32 @@ export async function applyDay(date: string, report: DayReport) {
   `;
   if (!log) return;
 
-  for (const entry of report.rules) {
+  for (const meal of report.meals.slice(0, 30)) {
+    if (!meal.description?.trim()) continue;
+    await sql`
+      insert into meals
+        (user_id, meal_date, description, slot, calories, protein_g, carbs_g, fat_g, fibre_g, estimated)
+      values (
+        ${user.id}, ${date}::date, ${meal.description.trim().slice(0, 200)},
+        ${meal.slot}, ${round(meal.calories)}, ${round(meal.protein_g)},
+        ${round(meal.carbs_g)}, ${round(meal.fat_g)}, ${round(meal.fibre_g)},
+        ${meal.estimated !== false}
+      )
+    `;
+  }
+
+  // A plan with a calorie or protein rule should get it filled from the food
+  // that was just logged, rather than asking for the same number twice.
+  const totals = macroTotals(report.meals);
+  const stated = new Set(report.rules.map((entry) => entry.rule_id));
+  const autoFilled = planned.rules.flatMap((rule) => {
+    if (rule.kind !== "count" || stated.has(rule.id)) return [];
+    const macro = macroForRule(rule);
+    if (!macro || totals[macro] <= 0) return [];
+    return [{ rule_id: rule.id, met: null, value: totals[macro], evidence: "" }];
+  });
+
+  for (const entry of [...report.rules, ...autoFilled]) {
     const rule = known.get(entry.rule_id);
     if (!rule) continue;
 

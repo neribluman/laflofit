@@ -29,6 +29,9 @@ export default function ResetDay({
   if (summary.ticks > 0) {
     items.push(`${summary.ticks} tick${summary.ticks === 1 ? "" : "s"}`);
   }
+  if (summary.meals > 0) {
+    items.push(`${summary.meals} food entr${summary.meals === 1 ? "y" : "ies"}`);
+  }
   if (summary.hasNote) items.push("your note");
   for (const workout of summary.workouts) {
     items.push(

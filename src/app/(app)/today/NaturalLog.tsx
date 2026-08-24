@@ -3,9 +3,10 @@
 import { useState, useTransition } from "react";
 import { readDay, applyDay, type ReadResult } from "./actions";
 import type { DayReport } from "@/lib/interpret";
+import { macroTotals } from "@/lib/macros";
 
 const EXAMPLE =
-  "Eggs and black coffee at 7, chicken salad for lunch, beans and steak for dinner. Caved and had a slice of bread. 3L water. Ran 5k, felt easy. 84.1kg this morning.";
+  "Two eggs and black coffee at 7, chicken caesar for lunch, beans and steak for dinner. Caved and had a slice of bread. 3L water. Ran 5k, felt easy. 84.1kg this morning.";
 
 export default function NaturalLog({
   date,
@@ -113,7 +114,9 @@ function Preview({
   onApply: () => void;
   onDiscard: () => void;
 }) {
+  const totals = macroTotals(report.meals);
   const nothing =
+    report.meals.length === 0 &&
     report.rules.length === 0 &&
     report.workouts.length === 0 &&
     report.weight == null;
@@ -124,9 +127,34 @@ function Preview({
 
       {nothing && (
         <p className="text-sm text-muted">
-          Nothing I could map onto your plan. Try naming what you ate, what you
-          trained, or what you weighed.
+          Nothing I could work with. Try naming what you ate, what you trained,
+          or what you weighed.
         </p>
+      )}
+
+      {report.meals.length > 0 && (
+        <div className="mb-3 rounded-xl bg-surface-2 p-3">
+          <div className="flex items-baseline gap-2">
+            <span className="nums text-2xl font-bold leading-none">
+              {totals.calories.toLocaleString()}
+            </span>
+            <span className="text-xs text-muted">kcal</span>
+            <span className="nums ml-auto text-xs text-muted">
+              P {totals.protein} · C {totals.carbs} · F {totals.fat}
+              {totals.fibre > 0 ? ` · Fibre ${totals.fibre}` : ""}
+            </span>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {report.meals.map((meal, i) => (
+              <li key={`m${i}`} className="flex gap-2 text-xs">
+                <span className="min-w-0 flex-1 truncate">{meal.description}</span>
+                <span className="nums shrink-0 text-muted">
+                  {meal.calories != null ? `${Math.round(meal.calories)} kcal` : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <ul className="space-y-1.5">

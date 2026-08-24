@@ -130,6 +130,34 @@ create table if not exists measurements (
 );
 
 -- ---------------------------------------------------------------------------
+-- What they actually ate
+--
+-- Separate from plan rules on purpose: rules are opinions about a diet, meals
+-- are facts about a day. You get the macros whether or not your plan happens
+-- to have a rule about them, and one bad line can be deleted without touching
+-- the rest of the day.
+-- ---------------------------------------------------------------------------
+
+create table if not exists meals (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  meal_date   date not null,
+  description text not null,
+  -- 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'drink', or null if unsaid
+  slot        text,
+  calories    numeric,
+  protein_g   numeric,
+  carbs_g     numeric,
+  fat_g       numeric,
+  fibre_g     numeric,
+  -- true when the numbers came from an estimate rather than something stated
+  estimated   boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists meals_user_date_idx on meals (user_id, meal_date desc);
+
+-- ---------------------------------------------------------------------------
 -- Accountability: cheering and heckling
 -- ---------------------------------------------------------------------------
 

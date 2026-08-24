@@ -2,6 +2,7 @@ import { sql, sqlOne } from "./db";
 import { sessionUserId } from "./session";
 import type {
   Comment,
+  Meal,
   Crew,
   DayLog,
   Measurement,
@@ -151,5 +152,23 @@ export async function commentsFor(targetIds: string[]): Promise<Comment[]> {
     from comments
     where target_id = any(${targetIds}::uuid[])
     order by created_at
+  `;
+}
+
+export async function mealsBetween(
+  userIds: string[],
+  from: string,
+  to: string,
+): Promise<Meal[]> {
+  if (userIds.length === 0) return [];
+  return sql<Meal>`
+    select id, user_id, meal_date::text as meal_date, description, slot,
+           calories::float8 as calories, protein_g::float8 as protein_g,
+           carbs_g::float8 as carbs_g, fat_g::float8 as fat_g,
+           fibre_g::float8 as fibre_g, estimated
+    from meals
+    where user_id = any(${userIds}::uuid[])
+      and meal_date between ${from}::date and ${to}::date
+    order by meal_date desc, created_at
   `;
 }

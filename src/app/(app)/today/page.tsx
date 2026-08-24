@@ -4,6 +4,7 @@ import {
   currentUser,
   dayLogsBetween,
   entriesForLogs,
+  mealsBetween,
   planWithRules,
 } from "@/lib/data";
 import { addDays, lastNDays, prettyDate, startOfWeek, todayIn } from "@/lib/dates";
@@ -15,6 +16,8 @@ import WeekStrip, { type StripDay } from "@/components/WeekStrip";
 import CheckInList from "./CheckInList";
 import NaturalLog from "./NaturalLog";
 import ResetDay from "./ResetDay";
+import MacroStrip from "@/components/MacroStrip";
+import MealList from "./MealList";
 import DayNote from "./DayNote";
 
 export default async function TodayPage({
@@ -52,6 +55,15 @@ export default async function TodayPage({
       log.log_date,
       scoreDay(rules, entriesByLog.get(log.id) ?? [], true),
     ]),
+  );
+
+  const meals = await mealsBetween([user.id], date, date);
+  // If the plan has a calorie ceiling, show progress against it.
+  const calorieRule = rules.find(
+    (rule) =>
+      rule.kind === "count" &&
+      (["kcal", "cal", "calories"].includes((rule.unit ?? "").toLowerCase()) ||
+        rule.label.toLowerCase().includes("calorie")),
   );
 
   const todayLog = logs.find((l) => l.log_date === date);
@@ -153,6 +165,10 @@ export default async function TodayPage({
           entries={todayEntries}
         />
       )}
+
+      <MacroStrip meals={meals} calorieTarget={calorieRule?.target ?? null} />
+
+      <MealList meals={meals} />
 
       {weeklyUsed.size > 0 && (
         <ul className="space-y-1">

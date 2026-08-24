@@ -5,11 +5,34 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { WORKOUT_KINDS } from "./presets";
 import type { PlanRule, Units } from "./types";
 import { weightUnit } from "./units";
+export { macroTotals } from "./macros";
 
 /** Feature is off unless a key is configured, so the app still runs without one. */
 export const canInterpret = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
 const DayReport = z.object({
+  meals: z
+    .array(
+      z.object({
+        description: z
+          .string()
+          .describe(
+            "what they ate or drank, including any portion you had to assume, e.g. 'a few beers (assumed 3 x 330ml)'",
+          ),
+        slot: z
+          .enum(["breakfast", "lunch", "dinner", "snack", "drink"])
+          .nullable(),
+        calories: z.number().nullable(),
+        protein_g: z.number().nullable(),
+        carbs_g: z.number().nullable(),
+        fat_g: z.number().nullable(),
+        fibre_g: z.number().nullable(),
+        estimated: z
+          .boolean()
+          .describe("false only when they gave you the numbers themselves"),
+      }),
+    )
+    .describe("every food and drink mentioned, one entry each"),
   rules: z.array(
     z.object({
       rule_id: z.string().describe("id of the rule this refers to"),
@@ -45,21 +68,34 @@ const DayReport = z.object({
     .describe("one short sentence in their own voice, for the day's note"),
   unclear: z
     .array(z.string())
-    .describe("anything they mentioned that you could not map onto a rule"),
+    .describe(
+      "only things you genuinely could not act on at all — not things you estimated",
+    ),
 });
 
 export type DayReport = z.infer<typeof DayReport>;
+export type ReportedMeal = DayReport["meals"][number];
 
 const SYSTEM = `You turn a person's free-text description of their day into structured entries for a diet and training tracker.
 
-Rules of the job:
-- Only report a rule when the message gives you real evidence about it. Say nothing about the rest. A day they didn't mention is not a day they failed.
-- An "avoid" rule is met when they stayed off the thing. "I had toast" means the no-white-carbs rule was NOT met (met: false). "No bread today" means it WAS met (met: true).
-- A "do" rule is met when they did it.
-- A "count" rule takes a number in that rule's unit. Convert if they used another unit.
-- Be literal about quantities. "A couple of litres" is 2, "a few beers" is not a number at all — put that in unclear instead of guessing.
-- Workouts: only real sessions. Walking to the shops is not a workout; a deliberate walk is.
-- If something is ambiguous, leave it out and list it in unclear. Under-reporting is fine; inventing is not.`;
+Capture everything they gave you. There are two separate jobs, and the second does not depend on the first:
+
+1. MEALS AND MACROS — log every food and drink they mention, whatever their plan happens to be about. One entry per item, with your best estimate of calories, protein, carbs, fat and fibre. This is the part to be generous with:
+   - Use standard portions when they don't give one. "A bowl of porridge" is a bowl of porridge; estimate it.
+   - When a quantity is vague, assume a sensible amount and SAY SO in the description — "a few beers (assumed 3 x 330ml)". An honest estimate beats a blank.
+   - If they give you numbers directly ("650 kcal, 40g protein"), use theirs and set estimated: false.
+   - Round to whole numbers. These are estimates and shouldn't pretend otherwise.
+   - Only skip an item if you truly cannot guess what it was.
+
+2. PLAN RULES — the rules are a separate, stricter question. Report a rule when the message gives you reasonable grounds, and read it the way a sensible friend would rather than demanding proof:
+   - An "avoid" rule is met when they stayed off the thing. "I had toast" means the no-white-carbs rule was NOT met (met: false). "No bread today" means it WAS met (met: true).
+   - A "do" rule is met when they did it.
+   - A "count" rule takes a number in that rule's unit. Convert units as needed, and fill it from the food you just logged where that makes sense — a calorie rule can be totalled from the meals.
+   - Where the message really says nothing about a rule, leave that rule out. Silence about a rule is not a failure.
+
+Workouts: only deliberate sessions. Walking to the shops is not one; a deliberate walk is.
+
+Never invent food they didn't mention. Estimating the size of something they did mention is expected; inventing a meal is not. Use "unclear" only for things you could not act on at all.`;
 
 export async function interpretDay({
   text,
@@ -86,10 +122,10 @@ export async function interpretDay({
   const response = await client.messages.parse({
     // Overridable: set ANTHROPIC_MODEL=claude-haiku-4-5 for a cheaper, faster read.
     model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 4000,
+    max_tokens: 8000,
     system: SYSTEM,
-    // A short extraction, not a reasoning problem — low effort keeps it quick and cheap.
-    output_config: { effort: "low", format: zodOutputFormat(DayReport) },
+    // Estimating portions takes a little more thought than plain extraction.
+    output_config: { effort: "medium", format: zodOutputFormat(DayReport) },
     messages: [
       {
         role: "user",
@@ -112,3 +148,4 @@ export async function interpretDay({
   const known = new Set(rules.map((rule) => rule.id));
   return { ...parsed, rules: parsed.rules.filter((r) => known.has(r.rule_id)) };
 }
+

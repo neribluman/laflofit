@@ -252,6 +252,7 @@ export async function signOut() {
 
 export type DaySummary = {
   ticks: number;
+  meals: number;
   hasNote: boolean;
   workouts: { kind: string; minutes: number | null }[];
   /** Already converted to the user's display units. */
@@ -262,7 +263,7 @@ export type DaySummary = {
 export async function describeDay(date: string): Promise<DaySummary> {
   const user = await requireUser();
 
-  const [ticks, note, workouts, weights] = await Promise.all([
+  const [ticks, note, workouts, weights, meals] = await Promise.all([
     sqlOne<{ n: number }>`
       select count(*)::int as n from rule_entries re
       join day_logs d on d.id = re.day_log_id
@@ -282,10 +283,15 @@ export async function describeDay(date: string): Promise<DaySummary> {
       select weight_kg::float8 as weight_kg from measurements
       where user_id = ${user.id} and measured_on = ${date}::date
     `,
+    sqlOne<{ n: number }>`
+      select count(*)::int as n from meals
+      where user_id = ${user.id} and meal_date = ${date}::date
+    `,
   ]);
 
   return {
     ticks: ticks?.n ?? 0,
+    meals: meals?.n ?? 0,
     hasNote: Boolean(note?.note),
     workouts,
     weight:
@@ -317,6 +323,10 @@ export async function resetDay(date: string) {
     delete from measurements
     where user_id = ${user.id} and measured_on = ${date}::date
   `;
+  await sql`
+    delete from meals
+    where user_id = ${user.id} and meal_date = ${date}::date
+  `;
 
   const orphans = [...logs, ...workouts].map((row) => row.id);
   if (orphans.length > 0) {
@@ -336,4 +346,11 @@ export async function deleteMeasurement(id: string) {
   revalidatePath("/log");
   revalidatePath("/me");
   revalidatePath("/crew");
+}
+
+export async function deleteMeal(id: string) {
+  const user = await requireUser();
+  await sql`delete from meals where id = ${id} and user_id = ${user.id}`;
+  revalidatePath("/today");
+  revalidatePath("/log");
 }

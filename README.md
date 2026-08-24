@@ -17,7 +17,8 @@ rules, so it works for any diet.
 | **Log** | Add workouts (type, minutes, how hard) and weigh-ins (weight, waist, body fat). |
 | **Crew** | Seven-day leaderboard, 30-day weight movement, and a feed of everything the crew logged — with emoji reactions and comments. |
 | **Me** | Your stats, a weight trend chart, settings, and a link to edit your plan. |
-| **Just tell me about your day** | A text box on Today. Write what you ate, how you trained and how it went in plain English; it reads that into rule ticks, workouts and a weigh-in, shows you what it understood, and only writes once you confirm. |
+| **Just tell me about your day** | A text box on Today. Write what you ate, how you trained and how it went in plain English. It logs **every food and drink with estimated calories, protein, carbs, fat and fibre** — whatever your plan happens to be about — plus rule ticks, workouts and a weigh-in. Shows you what it understood, and only writes once you confirm. |
+| **Macros** | Day totals sit under the checklist, with each item listed and individually deletable. If your plan has a calorie or protein rule, it fills itself in from the food you logged rather than asking twice. |
 | **Undo** | "Reset today" at the bottom of Today wipes that date back to never-logged. It lists exactly what will go — ticks, note, workouts, weigh-in — before it deletes anything. Individual workouts and weigh-ins can also be deleted one at a time from Log. |
 | **Plan** | Add, edit and delete rules. Three kinds: *do it*, *avoid it*, *count it* (with a target). Rules can be daily or a once-a-week allowance, which is how the slow-carb cheat day works. |
 
@@ -81,7 +82,8 @@ npm run db:setup
 ```
 
 That generates a secret for signing login cookies, creates every table, and
-tells you how many it made. It's safe to run again — it never deletes anything.
+tells you how many it made. It's safe to run again — it never deletes anything,
+so this is also how you pick up new tables when the app gains a feature.
 
 ### 4. Optional: plain-English logging
 
