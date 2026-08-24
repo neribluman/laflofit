@@ -308,7 +308,7 @@ export default async function MePage() {
       <section>
         <h2 className="label">Photo</h2>
         <div className="card p-5">
-          <AvatarPicker emoji={user.emoji} />
+          <AvatarPicker />
           <p className="mt-3 text-center text-xs text-muted">
             Your crew sees this next to your score. Saves as soon as you take it.
           </p>

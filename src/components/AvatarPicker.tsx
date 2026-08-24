@@ -38,11 +38,9 @@ async function toSquareDataUrl(file: File): Promise<string> {
 
 export default function AvatarPicker({
   initial,
-  emoji,
   onSaved,
 }: {
   initial?: string | null;
-  emoji: string;
   onSaved?: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -76,17 +74,29 @@ export default function AvatarPicker({
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={preview}
-            alt=""
-            className="h-32 w-32 rounded-full object-cover"
-          />
+          <img src={preview} alt="" className="h-32 w-32 rounded-full object-cover" />
         ) : (
-          <span className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-dashed border-line bg-surface-2 text-4xl">
-            {emoji}
+          <span className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-line bg-surface-2">
+            {/* A head and shoulders, so it is obvious what belongs here.
+                Sits low and slightly oversized, the way a real portrait
+                fills a frame. */}
+            <svg
+              viewBox="0 0 64 64"
+              className="h-full w-full translate-y-1 text-muted/35"
+              fill="currentColor"
+              aria-hidden
+            >
+              <circle cx="32" cy="25" r="12" />
+              <path d="M10 62c0-12.5 9.8-20 22-20s22 7.5 22 20z" />
+            </svg>
           </span>
         )}
-        <span className="absolute right-0 bottom-0 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-ink">
+
+        <span className="absolute right-0 bottom-1 flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-ink shadow-sm">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 8.5A1.5 1.5 0 014.5 7h2L8 5h8l1.5 2h2A1.5 1.5 0 0121 8.5v9A1.5 1.5 0 0119.5 19h-15A1.5 1.5 0 013 17.5z" />
+            <circle cx="12" cy="13" r="3.2" />
+          </svg>
           {saving ? "…" : preview ? "Change" : "Take"}
         </span>
       </button>
@@ -99,6 +109,16 @@ export default function AvatarPicker({
         className="sr-only"
         onChange={(e) => handle(e.target.files?.[0])}
       />
+
+      {!preview && (
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          className="btn-primary mt-5 w-full"
+        >
+          Take a photo
+        </button>
+      )}
 
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
     </div>

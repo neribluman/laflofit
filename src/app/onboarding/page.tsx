@@ -66,11 +66,13 @@ export default async function Onboarding({
             thisYear={Number(today.slice(0, 4))}
             weightUnit={weightUnit(user.units)}
             lengthUnit={lengthUnit(user.units)}
-            emoji={user.emoji}
           />
 
-          <Link href="/onboarding?skip=1" className="btn-quiet mt-2 w-full">
-            Skip for now
+          <Link
+            href="/onboarding?skip=1"
+            className="btn-quiet mt-6 w-full text-xs"
+          >
+            Skip all of this and pick a plan
           </Link>
         </>
       ) : (

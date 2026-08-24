@@ -33,12 +33,10 @@ export default function IntakeSurvey({
   thisYear,
   weightUnit,
   lengthUnit,
-  emoji,
 }: {
   thisYear: number;
   weightUnit: string;
   lengthUnit: string;
-  emoji: string;
 }) {
   const router = useRouter();
   const steps: Step[] = [
@@ -205,7 +203,7 @@ export default function IntakeSurvey({
           )}
 
           {step.kind === "photo" && (
-            <AvatarPicker emoji={emoji} onSaved={() => set("done")} />
+            <AvatarPicker onSaved={() => set("done")} />
           )}
 
           {step.kind === "text" && (
@@ -223,16 +221,25 @@ export default function IntakeSurvey({
         </div>
 
         {step.kind !== "choice" && (
-          <button onClick={advance} disabled={saving} className="btn-primary mt-5 w-full">
+          // An empty answer still moves on, but the button stops competing
+          // for attention — on the photo step the loud one is "Take a photo",
+          // and everywhere else there is nothing yet to confirm.
+          <button
+            onClick={advance}
+            disabled={saving}
+            className={`mt-3 w-full ${value ? "btn-primary" : "btn-quiet"}`}
+          >
             {saving
               ? "Saving…"
               : last
-                ? "Done"
+                ? value
+                  ? "Done"
+                  : "Skip and finish"
                 : value
                   ? step.kind === "photo"
                     ? "Looks good"
                     : "Continue"
-                  : "Skip"}
+                  : "Skip this"}
           </button>
         )}
       </div>
