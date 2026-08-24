@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Visible copy of .env.local for pasting into Vercel. Never commit.
+vercel-env.txt

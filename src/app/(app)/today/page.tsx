@@ -35,13 +35,13 @@ import DayNote from "./DayNote";
 export default async function TodayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ d?: string }>;
+  searchParams: Promise<{ d?: string; show?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login");
 
   const today = todayIn(user.timezone);
-  const { d } = await searchParams;
+  const { d, show } = await searchParams;
   const date = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : today;
 
   const planned = user.active_plan_id
@@ -120,6 +120,17 @@ export default async function TodayPage({
     }
   }
 
+  // An untouched day shows nothing but the box. Everything else appears once
+  // there is something to show — or when someone asks for it explicitly,
+  // because typing shouldn't be the only way in.
+  const hasContent =
+    meals.length > 0 ||
+    workouts.length > 0 ||
+    todayWeight?.weight_kg != null ||
+    Boolean(todayLog?.note) ||
+    todayEntries.some((e) => e.checked != null || e.value != null);
+  const showAll = hasContent || show === "all" || !canInterpret();
+
   const prev = addDays(date, -1);
   const next = addDays(date, 1);
 
@@ -155,17 +166,25 @@ export default async function TodayPage({
             </p>
           )}
         </div>
-        <ScoreRing
-          ratio={score.ratio}
-          label={`${score.earned}/${score.possible} pts`}
-        />
+        {showAll && (
+          <ScoreRing
+            ratio={score.ratio}
+            label={`${score.earned}/${score.possible} pts`}
+          />
+        )}
       </header>
 
       <div className="lg:max-w-xl">
         <WeekStrip days={strip} selected={date} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      <div
+        className={
+          showAll
+            ? "grid gap-6 lg:grid-cols-2 lg:items-start"
+            : "mx-auto w-full max-w-xl"
+        }
+      >
         <div className="space-y-6">
           {canInterpret() && (
             <NaturalLog
@@ -173,104 +192,124 @@ export default async function TodayPage({
               date={date}
               weightUnit={weightUnit(user.units)}
               distanceUnit={distanceUnit(user.units)}
+              prominent={!showAll}
             />
+          )}
+
+          {!showAll && (
+            <p className="text-center text-sm text-muted">
+              Or{" "}
+              <Link
+                href={`/today?d=${date}&show=all`}
+                className="font-medium text-accent"
+              >
+                fill it in yourself
+              </Link>{" "}
+              instead.
+            </p>
           )}
 
           {/* These two hold local state seeded from the day's row, so the key
           carries that row's id: resetting the day deletes the row, the id
           changes, and both remount clean instead of showing stale ticks. */}
-          {rules.length === 0 ? (
-            <div className="card p-6 text-center">
-              <p className="text-sm text-muted">
-                This plan has no rules yet — nothing to tick off.
-              </p>
-              <Link href="/plan" className="btn-primary mt-4">
-                Add your rules
-              </Link>
-            </div>
-          ) : (
-            <CheckInList
-              key={`checks-${date}-${todayLog?.id ?? "empty"}`}
-              date={date}
-              rules={rules}
-              entries={todayEntries}
-            />
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <section className="space-y-2.5">
-            <h2 className="label mb-0">Food</h2>
-            {meals.length > 0 ? (
-              <>
-                <MacroStrip
-                  meals={meals}
-                  calorieTarget={calorieRule?.target ?? null}
+          {showAll && (
+            <>
+              {rules.length === 0 ? (
+                <div className="card p-6 text-center">
+                  <p className="text-sm text-muted">
+                    This plan has no rules yet — nothing to tick off.
+                  </p>
+                  <Link href="/plan" className="btn-primary mt-4">
+                    Add your rules
+                  </Link>
+                </div>
+              ) : (
+                <CheckInList
+                  key={`checks-${date}-${todayLog?.id ?? "empty"}`}
+                  date={date}
+                  rules={rules}
+                  entries={todayEntries}
                 />
-                <MealList meals={meals} />
-              </>
-            ) : (
-              <p className="card p-4 text-sm text-muted">
-                Nothing yet. Describe what you ate in the box, or add it by
-                hand.
-              </p>
-            )}
-            <AddFoodForm date={date} />
-          </section>
-
-          <section className="space-y-2.5">
-            <h2 className="label mb-0">Training</h2>
-            {workouts.length > 0 ? (
-              <WorkoutList
-                workouts={workouts}
-                exercises={exercises}
-                units={user.units}
-                weightUnit={weightUnit(user.units)}
-                distanceUnit={distanceUnit(user.units)}
-              />
-            ) : (
-              <p className="card p-4 text-sm text-muted">
-                Nothing yet. Describe the session in the box &mdash;
-                &ldquo;squats 5x5 at 100kg&rdquo; and the like &mdash; or add it
-                by hand.
-              </p>
-            )}
-            <AddWorkoutForm date={date} />
-          </section>
-
-          {todayWeight?.weight_kg != null && (
-            <p className="text-sm text-muted">
-              Weighed in at{" "}
-              <span className="nums font-semibold text-text">
-                {fmtWeight(todayWeight.weight_kg, user.units)}
-              </span>
-              .
-            </p>
+              )}
+            </>
           )}
-
-          {weeklyUsed.size > 0 && (
-            <ul className="space-y-1">
-              {[...weeklyUsed].map(([ruleId, usedOn]) => (
-                <li key={ruleId} className="text-xs text-muted">
-                  {rules.find((r) => r.id === ruleId)?.label} used this week on{" "}
-                  {prettyDate(usedOn, today)}.
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <DayNote
-            key={`note-${date}-${todayLog?.id ?? "empty"}`}
-            date={date}
-            initial={todayLog?.note ?? ""}
-          />
-
-          <Link href="/log" className="btn-ghost w-full">
-            History and by-hand entry →
-          </Link>
-
-          <ResetDay date={date} label={prettyDate(date, today)} />
         </div>
+
+        {showAll && (
+          <div className="space-y-6">
+            <section className="space-y-2.5">
+              <h2 className="label mb-0">Food</h2>
+              {meals.length > 0 ? (
+                <>
+                  <MacroStrip
+                    meals={meals}
+                    calorieTarget={calorieRule?.target ?? null}
+                  />
+                  <MealList meals={meals} />
+                </>
+              ) : (
+                <p className="card p-4 text-sm text-muted">
+                  Nothing yet. Describe what you ate in the box, or add it by
+                  hand.
+                </p>
+              )}
+              <AddFoodForm date={date} />
+            </section>
+
+            <section className="space-y-2.5">
+              <h2 className="label mb-0">Training</h2>
+              {workouts.length > 0 ? (
+                <WorkoutList
+                  workouts={workouts}
+                  exercises={exercises}
+                  units={user.units}
+                  weightUnit={weightUnit(user.units)}
+                  distanceUnit={distanceUnit(user.units)}
+                />
+              ) : (
+                <p className="card p-4 text-sm text-muted">
+                  Nothing yet. Describe the session in the box &mdash;
+                  &ldquo;squats 5x5 at 100kg&rdquo; and the like &mdash; or add
+                  it by hand.
+                </p>
+              )}
+              <AddWorkoutForm date={date} />
+            </section>
+
+            {todayWeight?.weight_kg != null && (
+              <p className="text-sm text-muted">
+                Weighed in at{" "}
+                <span className="nums font-semibold text-text">
+                  {fmtWeight(todayWeight.weight_kg, user.units)}
+                </span>
+                .
+              </p>
+            )}
+
+            {weeklyUsed.size > 0 && (
+              <ul className="space-y-1">
+                {[...weeklyUsed].map(([ruleId, usedOn]) => (
+                  <li key={ruleId} className="text-xs text-muted">
+                    {rules.find((r) => r.id === ruleId)?.label} used this week
+                    on {prettyDate(usedOn, today)}.
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <DayNote
+              key={`note-${date}-${todayLog?.id ?? "empty"}`}
+              date={date}
+              initial={todayLog?.note ?? ""}
+            />
+
+            <Link href="/log" className="btn-ghost w-full">
+              History and by-hand entry →
+            </Link>
+
+            <ResetDay date={date} label={prettyDate(date, today)} />
+          </div>
+        )}
       </div>
     </main>
   );

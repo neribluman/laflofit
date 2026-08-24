@@ -13,10 +13,13 @@ export default function NaturalLog({
   date,
   weightUnit,
   distanceUnit,
+  prominent = false,
 }: {
   date: string;
   weightUnit: string;
   distanceUnit: string;
+  /** On an untouched day this box is the whole screen, so give it room. */
+  prominent?: boolean;
 }) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<ReadResult | null>(null);
@@ -59,11 +62,24 @@ export default function NaturalLog({
         id="day-text"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={3}
+        rows={prominent ? 6 : 3}
         maxLength={2000}
         placeholder={EXAMPLE}
-        className="field resize-none"
+        className={`field resize-none ${prominent ? "text-base leading-relaxed" : ""}`}
       />
+
+      {reading && (
+        <div className="mt-3 space-y-2" aria-live="polite">
+          <p className="text-sm text-muted">Reading your day…</p>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-3 animate-pulse rounded bg-surface-2"
+              style={{ width: `${[92, 74, 58][i]}%`, animationDelay: `${i * 140}ms` }}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="mt-2 flex items-center gap-2">
         <button
@@ -83,6 +99,10 @@ export default function NaturalLog({
           </button>
         )}
       </div>
+
+      <p className="mt-2 text-center text-xs text-muted">
+        Food, training, weight, how it went — all of it, in one go.
+      </p>
 
       {result && !result.ok && (
         <p className="mt-3 text-sm text-bad">{result.error}</p>
