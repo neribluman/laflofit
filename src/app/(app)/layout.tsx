@@ -13,7 +13,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-dvh pb-20">
-      <div className="mx-auto w-full max-w-lg px-4 pt-6">{children}</div>
+      <div className="mx-auto w-full max-w-lg px-4 pt-6 lg:max-w-5xl">{children}</div>
       <NavBar />
     </div>
   );

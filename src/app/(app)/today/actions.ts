@@ -5,9 +5,17 @@ import { redirect } from "next/navigation";
 import { sql, sqlOne } from "@/lib/db";
 import { currentUser, planWithRules } from "@/lib/data";
 import { interpretDay, macroTotals, type DayReport } from "@/lib/interpret";
-import { displayToKg } from "@/lib/units";
+import { displayToKg, displayToKm } from "@/lib/units";
 import { WORKOUT_KINDS } from "@/lib/presets";
 import type { PlanRule, User } from "@/lib/types";
+
+const clamp = (value: number | null | undefined, max: number) =>
+  value == null || !Number.isFinite(value)
+    ? null
+    : Math.max(0, Math.min(max, Math.round(value)));
+
+const positive = (value: number | null | undefined) =>
+  value == null || !Number.isFinite(value) || value < 0 ? null : value;
 
 const round = (value: number | null | undefined) =>
   value == null || !Number.isFinite(value) ? null : Math.round(value);
@@ -142,15 +150,34 @@ export async function applyDay(date: string, report: DayReport) {
 
   for (const workout of report.workouts.slice(0, 5)) {
     if (!WORKOUT_KINDS.includes(workout.kind)) continue;
-    await sql`
+
+    const session = await sqlOne<{ id: string }>`
       insert into workouts (user_id, workout_date, kind, minutes, intensity, notes)
       values (
-        ${user.id}, ${date}::date, ${workout.kind},
-        ${workout.minutes == null ? null : Math.max(0, Math.min(600, Math.round(workout.minutes)))},
+        ${user.id}, ${date}::date, ${workout.kind}, ${clamp(workout.minutes, 600)},
         ${["easy", "moderate", "hard"].includes(workout.intensity) ? workout.intensity : "moderate"},
         ${workout.notes?.slice(0, 300) ?? null}
       )
+      returning id
     `;
+    if (!session) continue;
+
+    for (const [i, exercise] of (workout.exercises ?? []).slice(0, 30).entries()) {
+      if (!exercise.name?.trim()) continue;
+      await sql`
+        insert into exercises
+          (workout_id, name, sets, reps, weight_kg, distance_km, minutes, notes, sort_order)
+        values (
+          ${session.id}, ${exercise.name.trim().slice(0, 80)},
+          ${clamp(exercise.sets, 50)}, ${clamp(exercise.reps, 1000)},
+          ${positive(exercise.weight) == null ? null : displayToKg(exercise.weight!, user.units)},
+          ${positive(exercise.distance) == null ? null : displayToKm(exercise.distance!, user.units)},
+          ${clamp(exercise.minutes, 600)},
+          ${exercise.notes?.slice(0, 200) ?? null},
+          ${i}
+        )
+      `;
+    }
   }
 
   if (report.weight != null && Number.isFinite(report.weight) && report.weight > 0) {

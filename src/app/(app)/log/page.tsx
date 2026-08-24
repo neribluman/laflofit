@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   currentUser,
@@ -15,7 +16,6 @@ import {
   lengthUnit,
   weightUnit,
 } from "@/lib/units";
-import { canInterpret } from "@/lib/interpret";
 import { describeExercise } from "@/lib/exercise-format";
 import { WORKOUT_KINDS } from "@/lib/presets";
 import {
@@ -25,7 +25,6 @@ import {
   saveMeasurement,
 } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
-import WorkoutLog from "./WorkoutLog";
 
 export default async function LogPage() {
   const user = await currentUser();
@@ -50,15 +49,18 @@ export default async function LogPage() {
   const distance = distanceUnit(user.units);
 
   return (
-    <main className="space-y-8">
-      <h1 className="text-2xl font-bold tracking-tight">Log</h1>
-
-      {canInterpret() && (
-        <section>
-          <h2 className="label">Today&apos;s training</h2>
-          <WorkoutLog today={today} weightUnit={weight} distanceUnit={distance} />
-        </section>
-      )}
+    <main className="mx-auto max-w-lg space-y-8 lg:max-w-2xl">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">History</h1>
+        <p className="mt-1 text-sm text-muted">
+          Everything you&apos;ve logged, and the forms for adding something by
+          hand. Day-to-day, just talk to the box on{" "}
+          <Link href="/today" className="font-medium text-accent">
+            Today
+          </Link>
+          .
+        </p>
+      </header>
 
       <section>
         <h2 className="label">Last 3 weeks of training</h2>
@@ -132,7 +134,7 @@ export default async function LogPage() {
       </section>
 
       <section>
-        <h2 className="label">Weigh-in</h2>
+        <h2 className="label">Add a weigh-in</h2>
         <form action={saveMeasurement} className="card space-y-4 p-4">
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -79,7 +79,7 @@ export default async function MePage() {
       : null;
 
   return (
-    <main className="space-y-8">
+    <main className="mx-auto max-w-lg space-y-8 lg:max-w-2xl">
       <header className="flex items-center gap-3">
         <span className="text-3xl">{user.emoji}</span>
         <div className="min-w-0">

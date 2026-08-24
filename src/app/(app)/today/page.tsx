@@ -4,13 +4,22 @@ import {
   currentUser,
   dayLogsBetween,
   entriesForLogs,
+  exercisesForWorkouts,
   mealsBetween,
+  measurementsFor,
   planWithRules,
+  workoutsBetween,
 } from "@/lib/data";
-import { addDays, lastNDays, prettyDate, startOfWeek, todayIn } from "@/lib/dates";
+import {
+  addDays,
+  lastNDays,
+  prettyDate,
+  startOfWeek,
+  todayIn,
+} from "@/lib/dates";
 import { currentStreak, scoreDay } from "@/lib/scoring";
 import { canInterpret } from "@/lib/interpret";
-import { weightUnit } from "@/lib/units";
+import { distanceUnit, fmtWeight, weightUnit } from "@/lib/units";
 import ScoreRing from "@/components/ScoreRing";
 import WeekStrip, { type StripDay } from "@/components/WeekStrip";
 import CheckInList from "./CheckInList";
@@ -18,6 +27,7 @@ import NaturalLog from "./NaturalLog";
 import ResetDay from "./ResetDay";
 import MacroStrip from "@/components/MacroStrip";
 import MealList from "./MealList";
+import WorkoutList from "./WorkoutList";
 import DayNote from "./DayNote";
 
 export default async function TodayPage({
@@ -57,7 +67,13 @@ export default async function TodayPage({
     ]),
   );
 
-  const meals = await mealsBetween([user.id], date, date);
+  const [meals, workouts, weighIns] = await Promise.all([
+    mealsBetween([user.id], date, date),
+    workoutsBetween([user.id], date, date),
+    measurementsFor([user.id]),
+  ]);
+  const exercises = await exercisesForWorkouts(workouts.map((w) => w.id));
+  const todayWeight = weighIns.find((m) => m.measured_on === date);
   // If the plan has a calorie ceiling, show progress against it.
   const calorieRule = rules.find(
     (rule) =>
@@ -90,7 +106,8 @@ export default async function TodayPage({
   const weeklyUsed = new Map<string, string>();
   for (const rule of rules.filter((r) => r.cadence === "weekly")) {
     for (const log of logs) {
-      if (log.log_date < weekStart || log.log_date > addDays(weekStart, 6)) continue;
+      if (log.log_date < weekStart || log.log_date > addDays(weekStart, 6))
+        continue;
       const hit = (entriesByLog.get(log.id) ?? []).find(
         (e) => e.rule_id === rule.id && e.checked,
       );
@@ -136,62 +153,99 @@ export default async function TodayPage({
             </p>
           )}
         </div>
-        <ScoreRing ratio={score.ratio} label={`${score.earned}/${score.possible} pts`} />
+        <ScoreRing
+          ratio={score.ratio}
+          label={`${score.earned}/${score.possible} pts`}
+        />
       </header>
 
-      <WeekStrip days={strip} selected={date} />
+      <div className="lg:max-w-xl">
+        <WeekStrip days={strip} selected={date} />
+      </div>
 
-      {canInterpret() && (
-        <NaturalLog key={`log-${date}`} date={date} weightUnit={weightUnit(user.units)} />
-      )}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-6">
+          {canInterpret() && (
+            <NaturalLog
+              key={`log-${date}`}
+              date={date}
+              weightUnit={weightUnit(user.units)}
+              distanceUnit={distanceUnit(user.units)}
+            />
+          )}
 
-      {/* These two hold local state seeded from the day's row, so the key
+          {/* These two hold local state seeded from the day's row, so the key
           carries that row's id: resetting the day deletes the row, the id
           changes, and both remount clean instead of showing stale ticks. */}
-      {rules.length === 0 ? (
-        <div className="card p-6 text-center">
-          <p className="text-sm text-muted">
-            This plan has no rules yet — nothing to tick off.
-          </p>
-          <Link href="/plan" className="btn-primary mt-4">
-            Add your rules
-          </Link>
+          {rules.length === 0 ? (
+            <div className="card p-6 text-center">
+              <p className="text-sm text-muted">
+                This plan has no rules yet — nothing to tick off.
+              </p>
+              <Link href="/plan" className="btn-primary mt-4">
+                Add your rules
+              </Link>
+            </div>
+          ) : (
+            <CheckInList
+              key={`checks-${date}-${todayLog?.id ?? "empty"}`}
+              date={date}
+              rules={rules}
+              entries={todayEntries}
+            />
+          )}
         </div>
-      ) : (
-        <CheckInList
-          key={`checks-${date}-${todayLog?.id ?? "empty"}`}
-          date={date}
-          rules={rules}
-          entries={todayEntries}
-        />
-      )}
 
-      <MacroStrip meals={meals} calorieTarget={calorieRule?.target ?? null} />
+        <div className="space-y-6">
+          <MacroStrip
+            meals={meals}
+            calorieTarget={calorieRule?.target ?? null}
+          />
 
-      <MealList meals={meals} />
+          <MealList meals={meals} />
 
-      {weeklyUsed.size > 0 && (
-        <ul className="space-y-1">
-          {[...weeklyUsed].map(([ruleId, usedOn]) => (
-            <li key={ruleId} className="text-xs text-muted">
-              {rules.find((r) => r.id === ruleId)?.label} used this week on{" "}
-              {prettyDate(usedOn, today)}.
-            </li>
-          ))}
-        </ul>
-      )}
+          <WorkoutList
+            workouts={workouts}
+            exercises={exercises}
+            units={user.units}
+            weightUnit={weightUnit(user.units)}
+            distanceUnit={distanceUnit(user.units)}
+          />
 
-      <DayNote
-        key={`note-${date}-${todayLog?.id ?? "empty"}`}
-        date={date}
-        initial={todayLog?.note ?? ""}
-      />
+          {todayWeight?.weight_kg != null && (
+            <p className="text-sm text-muted">
+              Weighed in at{" "}
+              <span className="nums font-semibold text-text">
+                {fmtWeight(todayWeight.weight_kg, user.units)}
+              </span>
+              .
+            </p>
+          )}
 
-      <Link href="/log" className="btn-ghost w-full">
-        Log a workout or a weigh-in →
-      </Link>
+          {weeklyUsed.size > 0 && (
+            <ul className="space-y-1">
+              {[...weeklyUsed].map(([ruleId, usedOn]) => (
+                <li key={ruleId} className="text-xs text-muted">
+                  {rules.find((r) => r.id === ruleId)?.label} used this week on{" "}
+                  {prettyDate(usedOn, today)}.
+                </li>
+              ))}
+            </ul>
+          )}
 
-      <ResetDay date={date} label={prettyDate(date, today)} />
+          <DayNote
+            key={`note-${date}-${todayLog?.id ?? "empty"}`}
+            date={date}
+            initial={todayLog?.note ?? ""}
+          />
+
+          <Link href="/log" className="btn-ghost w-full">
+            History and by-hand entry →
+          </Link>
+
+          <ResetDay date={date} label={prettyDate(date, today)} />
+        </div>
+      </div>
     </main>
   );
 }

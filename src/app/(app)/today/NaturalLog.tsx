@@ -4,16 +4,19 @@ import { useState, useTransition } from "react";
 import { readDay, applyDay, type ReadResult } from "./actions";
 import type { DayReport } from "@/lib/interpret";
 import { macroTotals } from "@/lib/macros";
+import { describeExercise } from "@/lib/exercise-format";
 
 const EXAMPLE =
-  "Two eggs and black coffee at 7, chicken caesar for lunch, beans and steak for dinner. Caved and had a slice of bread. 3L water. Ran 5k, felt easy. 84.1kg this morning.";
+  "Two eggs and black coffee at 7, chicken caesar for lunch, beans and steak for dinner. Caved and had a slice of bread. 3L water. Squats 5x5 at 100kg then bench 3x8 at 70. 84.1kg this morning.";
 
 export default function NaturalLog({
   date,
   weightUnit,
+  distanceUnit,
 }: {
   date: string;
   weightUnit: string;
+  distanceUnit: string;
 }) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<ReadResult | null>(null);
@@ -90,6 +93,7 @@ export default function NaturalLog({
           report={result.report}
           labels={result.labels}
           weightUnit={weightUnit}
+          distanceUnit={distanceUnit}
           applying={applying}
           onApply={() => apply(result.report)}
           onDiscard={() => setResult(null)}
@@ -103,6 +107,7 @@ function Preview({
   report,
   labels,
   weightUnit,
+  distanceUnit,
   applying,
   onApply,
   onDiscard,
@@ -110,6 +115,7 @@ function Preview({
   report: DayReport;
   labels: Record<string, string>;
   weightUnit: string;
+  distanceUnit: string;
   applying: boolean;
   onApply: () => void;
   onDiscard: () => void;
@@ -187,10 +193,22 @@ function Preview({
             <span aria-hidden className="text-cool">
               ▲
             </span>
-            <span>
+            <span className="min-w-0 flex-1">
               {workout.kind}
               {workout.minutes ? `, ${workout.minutes} min` : ""} ·{" "}
               {workout.intensity}
+              {workout.exercises?.length > 0 && (
+                <span className="mt-1 block space-y-0.5">
+                  {workout.exercises.map((exercise, j) => (
+                    <span key={`e${j}`} className="flex gap-2 text-xs text-muted">
+                      <span className="min-w-0 flex-1 truncate">{exercise.name}</span>
+                      <span className="nums shrink-0">
+                        {describeExercise(exercise, weightUnit, distanceUnit) || "—"}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              )}
             </span>
           </li>
         ))}

@@ -191,7 +191,7 @@ export default async function CrewPage() {
   }
 
   return (
-    <main className="space-y-8">
+    <main className="mx-auto max-w-lg space-y-8 lg:max-w-2xl">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">{crew.name}</h1>
         <p className="mt-1 text-sm text-muted">
