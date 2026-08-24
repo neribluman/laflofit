@@ -209,3 +209,17 @@ create index if not exists reactions_target_idx       on reactions (target_type,
 create index if not exists comments_target_idx        on comments (target_type, target_id);
 create index if not exists plan_rules_plan_idx        on plan_rules (plan_id, sort_order);
 create index if not exists users_crew_idx             on users (crew_id);
+
+-- ---------------------------------------------------------------------------
+-- Columns added after the first release
+--
+-- The create-table blocks above are guarded with "if not exists", which means
+-- they do nothing on a database that already has the table. New columns
+-- therefore need saying separately.
+-- ---------------------------------------------------------------------------
+
+-- Height barely changes, so it lives on the person rather than on each
+-- weigh-in. It is what makes BMI possible.
+alter table users add column if not exists height_cm numeric;
+
+alter table measurements add column if not exists resting_hr int;

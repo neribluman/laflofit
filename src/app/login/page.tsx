@@ -9,7 +9,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ code?: string; who?: string; join?: string }>;
 }) {
-  if (await currentUser()) redirect("/today");
+  if (await currentUser()) redirect("/crew");
 
   const { code, who, join } = await searchParams;
   const crew = code ? await crewByCode(code) : null;

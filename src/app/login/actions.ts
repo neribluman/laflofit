@@ -67,7 +67,7 @@ export async function signIn(
     update users set failed_attempts = 0, locked_until = null where id = ${row.id}
   `;
   await startSession(row.id);
-  redirect("/today");
+  redirect("/crew");
 }
 
 /** New person joining an existing crew with its invite code. */

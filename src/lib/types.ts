@@ -17,6 +17,7 @@ export type User = {
   emoji: string;
   units: Units;
   timezone: string;
+  height_cm: number | null;
   active_plan_id: string | null;
   created_at: string;
 };
@@ -73,6 +74,7 @@ export type Measurement = {
   weight_kg: number | null;
   body_fat: number | null;
   waist_cm: number | null;
+  resting_hr: number | null;
   notes: string | null;
 };
 

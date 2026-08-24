@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/data";
 import StartForm from "./StartForm";
 
 export default async function StartPage() {
-  if (await currentUser()) redirect("/today");
+  if (await currentUser()) redirect("/crew");
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">

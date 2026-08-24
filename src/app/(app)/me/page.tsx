@@ -5,16 +5,28 @@ import {
   currentUser,
   dayLogsBetween,
   entriesForLogs,
+  exercisesForWorkouts,
   measurementsFor,
   planWithRules,
   workoutsBetween,
 } from "@/lib/data";
-import { addDays, todayIn } from "@/lib/dates";
+import { addDays, prettyDate, todayIn } from "@/lib/dates";
 import { bestStreak, currentStreak, scoreDay } from "@/lib/scoring";
-import { fmtWeight, kgToDisplay, weightUnit } from "@/lib/units";
+import { describeExercise } from "@/lib/exercise-format";
+import {
+  cmToDisplay,
+  distanceUnit,
+  fmtWeight,
+  kgToDisplay,
+  kmToDisplay,
+  lengthUnit,
+  weightUnit,
+} from "@/lib/units";
 import TrendLine from "@/components/TrendLine";
-import { signOut, updateProfile } from "../actions";
+import { deleteMeasurement, deleteWorkout, signOut, updateProfile } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
+import BiomarkerForm from "./BiomarkerForm";
+import BiomarkerGrid from "./BiomarkerGrid";
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -34,6 +46,8 @@ export default async function MePage() {
 
   const today = todayIn(user.timezone);
   const from = addDays(today, -89);
+  const weight = weightUnit(user.units);
+  const distance = distanceUnit(user.units);
 
   const planned = user.active_plan_id
     ? await planWithRules(user.active_plan_id)
@@ -43,14 +57,25 @@ export default async function MePage() {
   const [crew, logs, workouts, measurements] = await Promise.all([
     crewById(user.crew_id),
     dayLogsBetween([user.id], from, today),
-    workoutsBetween([user.id], from, today),
+    workoutsBetween([user.id], addDays(today, -20), today),
     measurementsFor([user.id]),
   ]);
 
-  const entries = await entriesForLogs(logs.map((l) => l.id));
+  const [entries, exercises] = await Promise.all([
+    entriesForLogs(logs.map((l) => l.id)),
+    exercisesForWorkouts(workouts.map((w) => w.id)),
+  ]);
+
   const entriesByLog = new Map<string, typeof entries>();
   for (const e of entries) {
     entriesByLog.set(e.day_log_id, [...(entriesByLog.get(e.day_log_id) ?? []), e]);
+  }
+  const byWorkout = new Map<string, typeof exercises>();
+  for (const exercise of exercises) {
+    byWorkout.set(exercise.workout_id, [
+      ...(byWorkout.get(exercise.workout_id) ?? []),
+      exercise,
+    ]);
   }
 
   const perfectByDate = new Map<string, boolean>();
@@ -73,10 +98,7 @@ export default async function MePage() {
     date: m.measured_on,
     value: kgToDisplay(m.weight_kg!, user.units),
   }));
-  const deltaKg =
-    weights.length >= 2
-      ? weights[weights.length - 1].weight_kg! - weights[0].weight_kg!
-      : null;
+  const recent = [...measurements].reverse().slice(0, 8);
 
   return (
     <main className="mx-auto max-w-lg space-y-8 lg:max-w-2xl">
@@ -90,44 +112,155 @@ export default async function MePage() {
         </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-2.5">
-        <Stat
-          label="Current"
-          value={fmtWeight(weights.at(-1)?.weight_kg ?? null, user.units)}
-          sub={
-            deltaKg != null
-              ? `${deltaKg > 0 ? "+" : ""}${kgToDisplay(deltaKg, user.units).toFixed(1)} ${weightUnit(user.units)} since you started`
-              : "Log a second weigh-in for a trend"
-          }
+      <section className="space-y-2.5">
+        <h2 className="label mb-0">Biomarkers</h2>
+        <BiomarkerGrid
+          measurements={measurements}
+          units={user.units}
+          heightCm={user.height_cm}
         />
-        <Stat
-          label="Streak"
-          value={`${currentStreak(today, perfectByDate)} d`}
-          sub={`Best: ${bestStreak(perfectDates)} days`}
-        />
-        <Stat
-          label="Days logged"
-          value={`${loggedThisMonth}/30`}
-          sub="Last 30 days"
-        />
-        <Stat
-          label="Workouts"
-          value={String(workoutsThisMonth)}
-          sub={minutesThisMonth > 0 ? `${minutesThisMonth} min total` : "Last 30 days"}
+        <BiomarkerForm
+          date={today}
+          units={user.units}
+          knowsHeight={user.height_cm != null}
         />
       </section>
 
       {points.length >= 2 && (
         <section>
-          <h2 className="label">Weight ({weightUnit(user.units)})</h2>
+          <h2 className="label">Weight ({weight})</h2>
           <div className="card p-3">
-            <TrendLine
-              points={points}
-              unit={weightUnit(user.units)}
-            />
+            <TrendLine points={points} unit={weight} />
           </div>
         </section>
       )}
+
+      {recent.length > 0 && (
+        <section>
+          <h2 className="label">Recent entries</h2>
+          <ul className="card divide-y divide-line">
+            {recent.map((m) => (
+              <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                <span className="flex-1 text-muted">
+                  {prettyDate(m.measured_on, today)}
+                </span>
+                <span className="nums shrink-0 text-xs text-muted">
+                  {[
+                    m.weight_kg != null ? fmtWeight(m.weight_kg, user.units) : null,
+                    m.body_fat != null ? `${m.body_fat}%` : null,
+                    m.waist_cm != null
+                      ? `${cmToDisplay(m.waist_cm, user.units).toFixed(1)} ${lengthUnit(user.units)}`
+                      : null,
+                    m.resting_hr != null ? `${m.resting_hr} bpm` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                <form action={deleteMeasurement.bind(null, m.id)}>
+                  <button
+                    className="btn-quiet px-1 py-1 text-xs"
+                    aria-label={`Delete entry from ${m.measured_on}`}
+                  >
+                    Delete
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h2 className="label">Last 30 days</h2>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Stat
+            label="Streak"
+            value={`${currentStreak(today, perfectByDate)} d`}
+            sub={`Best: ${bestStreak(perfectDates)} days`}
+          />
+          <Stat label="Days logged" value={`${loggedThisMonth}/30`} />
+          <Stat label="Workouts" value={String(workoutsThisMonth)} />
+          <Stat
+            label="Training time"
+            value={`${minutesThisMonth} min`}
+            sub={minutesThisMonth > 0 ? "across the month" : undefined}
+          />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="label">Training history</h2>
+        {workouts.length === 0 ? (
+          <p className="card p-4 text-sm text-muted">
+            Nothing in the last three weeks. Log a session from{" "}
+            <Link href="/today" className="font-medium text-accent">
+              Today
+            </Link>
+            .
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {workouts.map((w) => {
+              const moves = byWorkout.get(w.id) ?? [];
+              return (
+                <li key={w.id} className="card p-3.5">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">
+                        {w.kind}
+                        {w.minutes ? (
+                          <span className="nums text-muted"> · {w.minutes} min</span>
+                        ) : null}
+                        <span className="text-muted"> · {w.intensity}</span>
+                      </p>
+                      <p className="text-xs text-muted">
+                        {prettyDate(w.workout_date, today)}
+                        {w.notes ? ` — ${w.notes}` : ""}
+                      </p>
+                    </div>
+                    <form action={deleteWorkout.bind(null, w.id)}>
+                      <button
+                        className="btn-quiet px-2 py-1 text-xs"
+                        aria-label={`Delete ${w.kind} on ${w.workout_date}`}
+                      >
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                  {moves.length > 0 && (
+                    <ul className="mt-2 space-y-1 border-t border-line pt-2">
+                      {moves.map((move) => (
+                        <li key={move.id} className="flex gap-2 text-xs">
+                          <span className="min-w-0 flex-1 truncate">{move.name}</span>
+                          <span className="nums shrink-0 text-muted">
+                            {describeExercise(
+                              {
+                                sets: move.sets,
+                                reps: move.reps,
+                                weight:
+                                  move.weight_kg == null
+                                    ? null
+                                    : kgToDisplay(move.weight_kg, user.units),
+                                distance:
+                                  move.distance_km == null
+                                    ? null
+                                    : kmToDisplay(move.distance_km, user.units),
+                                minutes: move.minutes,
+                              },
+                              weight,
+                              distance,
+                            ) || "—"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section>
         <h2 className="label">Your plan</h2>

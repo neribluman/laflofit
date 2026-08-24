@@ -3,5 +3,5 @@ import { currentUser } from "@/lib/data";
 
 export default async function Home() {
   const user = await currentUser();
-  redirect(user ? "/today" : "/login");
+  redirect(user ? "/crew" : "/login");
 }

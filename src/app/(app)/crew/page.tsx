@@ -16,6 +16,7 @@ import { currentStreak, scoreDay } from "@/lib/scoring";
 import { kgToDisplay, weightUnit } from "@/lib/units";
 import type { PlanRule } from "@/lib/types";
 import LeaderBars, { type LeaderRow } from "@/components/LeaderBars";
+import Link from "next/link";
 import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
 import InviteCode from "./InviteCode";
@@ -127,6 +128,18 @@ export default async function CrewPage() {
     })
     .filter((value): value is NonNullable<typeof value> => value !== null);
 
+  // Crew is the landing screen, so it should say when you're the one slacking.
+  const myLogToday = logs.find(
+    (log) => log.user_id === user.id && log.log_date === today,
+  );
+  const loggedToday =
+    (myLogToday
+      ? (entriesByLog.get(myLogToday.id) ?? []).some(
+          (e) => e.checked != null || e.value != null,
+        )
+      : false) ||
+    workouts.some((w) => w.user_id === user.id && w.workout_date === today);
+
   // ---- Feed ---------------------------------------------------------------
   const feedFrom = addDays(today, -9);
   const byId = new Map(roster.map((member) => [member.id, member]));
@@ -198,6 +211,26 @@ export default async function CrewPage() {
           {roster.length} member{roster.length === 1 ? "" : "s"}
         </p>
       </header>
+
+      {!loggedToday && (
+        <Link
+          href="/today"
+          className="card flex items-center gap-3 border-accent/40 bg-accent/5 p-4 hover:border-accent"
+        >
+          <span className="text-xl" aria-hidden>
+            ✍️
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">
+              You haven&apos;t logged today
+            </span>
+            <span className="block text-xs text-muted">
+              Everyone can see the gap. Takes one sentence.
+            </span>
+          </span>
+          <span className="text-muted">→</span>
+        </Link>
+      )}
 
       <InviteCode code={crew.invite_code} />
 

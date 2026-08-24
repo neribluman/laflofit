@@ -196,7 +196,7 @@ export async function applyDay(date: string, report: DayReport) {
   }
 
   revalidatePath("/today");
-  revalidatePath("/log");
+  revalidatePath("/me");
   revalidatePath("/crew");
   revalidatePath("/me");
 }

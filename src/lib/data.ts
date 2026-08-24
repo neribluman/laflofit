@@ -23,7 +23,8 @@ export async function currentUser(): Promise<User | null> {
   const id = await sessionUserId();
   if (!id) return null;
   return sqlOne<User>`
-    select id, crew_id, display_name, emoji, units, timezone, active_plan_id,
+    select id, crew_id, display_name, emoji, units, timezone,
+           height_cm::float8 as height_cm, active_plan_id,
            created_at::text as created_at
     from users where id = ${id}
   `;
@@ -45,7 +46,8 @@ export async function crewByCode(code: string): Promise<Crew | null> {
 
 export async function crewRoster(crewId: string): Promise<User[]> {
   return sql<User>`
-    select id, crew_id, display_name, emoji, units, timezone, active_plan_id,
+    select id, crew_id, display_name, emoji, units, timezone,
+           height_cm::float8 as height_cm, active_plan_id,
            created_at::text as created_at
     from users
     where crew_id = ${crewId}
@@ -131,7 +133,7 @@ export async function measurementsFor(userIds: string[]): Promise<Measurement[]>
   return sql<Measurement>`
     select id, user_id, measured_on::text as measured_on,
            weight_kg::float8 as weight_kg, body_fat::float8 as body_fat,
-           waist_cm::float8 as waist_cm, notes
+           waist_cm::float8 as waist_cm, resting_hr, notes
     from measurements
     where user_id = any(${userIds}::uuid[])
     order by measured_on

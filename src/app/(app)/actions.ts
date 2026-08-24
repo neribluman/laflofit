@@ -111,7 +111,7 @@ export async function addWorkout(formData: FormData) {
     )
   `;
 
-  revalidatePath("/log");
+  revalidatePath("/me");
   revalidatePath("/crew");
   revalidatePath("/me");
 }
@@ -119,7 +119,7 @@ export async function addWorkout(formData: FormData) {
 export async function deleteWorkout(id: string) {
   const user = await requireUser();
   await sql`delete from workouts where id = ${id} and user_id = ${user.id}`;
-  revalidatePath("/log");
+  revalidatePath("/me");
   revalidatePath("/crew");
 }
 
@@ -136,27 +136,42 @@ export async function saveMeasurement(formData: FormData) {
   const weight = num("weight");
   const waist = num("waist");
   const bodyFat = num("body_fat");
-  if (weight == null && waist == null && bodyFat == null) return;
+  const restingHr = num("resting_hr");
+
+  // Height sits on the person, not the entry — save it whenever it's given.
+  const height = num("height");
+  if (height != null && height > 0) {
+    await sql`
+      update users set height_cm = ${displayToCm(height, user.units)}
+      where id = ${user.id}
+    `;
+    revalidatePath("/me");
+  }
+
+  if (weight == null && waist == null && bodyFat == null && restingHr == null) {
+    return;
+  }
 
   await sql`
     insert into measurements
-      (user_id, measured_on, weight_kg, waist_cm, body_fat, notes)
+      (user_id, measured_on, weight_kg, waist_cm, body_fat, resting_hr, notes)
     values (
       ${user.id},
       ${String(formData.get("measured_on"))}::date,
       ${weight == null ? null : displayToKg(weight, user.units)},
       ${waist == null ? null : displayToCm(waist, user.units)},
       ${bodyFat},
+      ${restingHr == null ? null : Math.round(restingHr)},
       ${String(formData.get("notes") ?? "").trim().slice(0, 300) || null}
     )
     on conflict (user_id, measured_on) do update set
-      weight_kg = excluded.weight_kg,
-      waist_cm  = excluded.waist_cm,
-      body_fat  = excluded.body_fat,
-      notes     = excluded.notes
+      weight_kg  = coalesce(excluded.weight_kg, measurements.weight_kg),
+      waist_cm   = coalesce(excluded.waist_cm, measurements.waist_cm),
+      body_fat   = coalesce(excluded.body_fat, measurements.body_fat),
+      resting_hr = coalesce(excluded.resting_hr, measurements.resting_hr),
+      notes      = coalesce(excluded.notes, measurements.notes)
   `;
 
-  revalidatePath("/log");
   revalidatePath("/me");
   revalidatePath("/crew");
 }
@@ -335,7 +350,7 @@ export async function resetDay(date: string) {
   }
 
   revalidatePath("/today");
-  revalidatePath("/log");
+  revalidatePath("/me");
   revalidatePath("/crew");
   revalidatePath("/me");
 }
@@ -343,7 +358,6 @@ export async function resetDay(date: string) {
 export async function deleteMeasurement(id: string) {
   const user = await requireUser();
   await sql`delete from measurements where id = ${id} and user_id = ${user.id}`;
-  revalidatePath("/log");
   revalidatePath("/me");
   revalidatePath("/crew");
 }
@@ -352,7 +366,7 @@ export async function deleteMeal(id: string) {
   const user = await requireUser();
   await sql`delete from meals where id = ${id} and user_id = ${user.id}`;
   revalidatePath("/today");
-  revalidatePath("/log");
+  revalidatePath("/me");
 }
 
 export async function addMeal(formData: FormData) {
@@ -382,5 +396,5 @@ export async function addMeal(formData: FormData) {
   `;
 
   revalidatePath("/today");
-  revalidatePath("/log");
+  revalidatePath("/me");
 }

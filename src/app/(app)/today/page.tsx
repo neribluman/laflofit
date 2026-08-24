@@ -303,8 +303,8 @@ export default async function TodayPage({
               initial={todayLog?.note ?? ""}
             />
 
-            <Link href="/log" className="btn-ghost w-full">
-              History and by-hand entry →
+            <Link href="/me" className="btn-ghost w-full">
+              Your data and history →
             </Link>
 
             <ResetDay date={date} label={prettyDate(date, today)} />

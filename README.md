@@ -14,9 +14,8 @@ rules, so it works for any diet.
 | Screen | What's on it |
 |---|---|
 | **Today** | Your plan's rules as a checklist, a day score, a streak, and the last 7 days at a glance. Tap back through previous days to fill in what you missed. |
-| **History** | Everything you've logged, plus the forms for adding a workout or weigh-in by hand. Nothing about *today* lives here — Today owns the day. |
-| **Crew** | Seven-day leaderboard, 30-day weight movement, and a feed of everything the crew logged — with emoji reactions and comments. |
-| **Me** | Your stats, a weight trend chart, settings, and a link to edit your plan. |
+| **Me** | Your biomarkers — weight, height, BMI, body fat, waist, resting heart rate — with somewhere to add a new reading, the weight trend, your training history, and settings. |
+| **Crew** | The tab the app opens on. Seven-day leaderboard, 30-day weight movement, a feed of everything the crew logged with reactions and comments — and a nudge when you're the one who hasn't logged. |
 | **Just tell me about your day** | One text box on Today, for the whole day. Write what you ate, what you lifted and how it went in plain English. It logs **every food and drink with estimated calories, protein, carbs, fat and fibre**, reads gym shorthand into **exercises with sets, reps and load**, ticks your plan's rules, and records a weigh-in. Shows you what it understood, and only writes once you confirm. |
 | **Macros** | Day totals sit alongside the checklist, with every food and every exercise listed and individually deletable. If your plan has a calorie or protein rule, it fills itself in from the food you logged rather than asking twice. |
 | **Undo** | "Reset today" at the bottom of Today wipes that date back to never-logged. It lists exactly what will go — ticks, note, workouts, weigh-in — before it deletes anything. Individual workouts and weigh-ins can also be deleted one at a time from Log. |
@@ -152,9 +151,8 @@ src/
     onboarding/       choose a plan, first time only
     (app)/            everything behind the login
       today/          the whole day: the text box, rules, food, training
-      log/            history, and the by-hand forms
-      crew/           leaderboard and feed
-      me/             stats and settings
+        crew/           leaderboard and feed
+      me/             biomarkers, history, stats and settings
       plan/           the rule editor
       actions.ts      every database write the app makes
   components/         shared UI, charts and meters
