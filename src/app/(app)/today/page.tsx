@@ -129,7 +129,7 @@ export default async function TodayPage({
       <WeekStrip days={strip} selected={date} />
 
       {canInterpret() && (
-        <NaturalLog key={date} date={date} weightUnit={weightUnit(user.units)} />
+        <NaturalLog key={`log-${date}`} date={date} weightUnit={weightUnit(user.units)} />
       )}
 
       {rules.length === 0 ? (
@@ -156,7 +156,7 @@ export default async function TodayPage({
         </ul>
       )}
 
-      <DayNote key={date} date={date} initial={todayLog?.note ?? ""} />
+      <DayNote key={`note-${date}`} date={date} initial={todayLog?.note ?? ""} />
 
       <Link href="/log" className="btn-ghost w-full">
         Log a workout or a weigh-in →
