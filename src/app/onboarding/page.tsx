@@ -2,23 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { crewById, currentUser, plansForCrew } from "@/lib/data";
 import { todayIn } from "@/lib/dates";
-import { canInterpret } from "@/lib/interpret";
 import { lengthUnit, weightUnit } from "@/lib/units";
 import PlanStep from "./PlanStep";
-import IntakeStep from "./IntakeStep";
-import ProfileFields from "@/components/ProfileFields";
+import IntakeSurvey from "./IntakeSurvey";
 
 const STEPS = ["You", "Plan"] as const;
 
 export default async function Onboarding({
   searchParams,
 }: {
-  searchParams: Promise<{ skip?: string; hand?: string }>;
+  searchParams: Promise<{ skip?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login");
-
-  const { skip, hand } = await searchParams;
+  const { skip } = await searchParams;
   const today = todayIn(user.timezone);
 
   // Anything at all on file counts as done — this is asked once, not nagged.
@@ -58,30 +55,17 @@ export default async function Onboarding({
       {onIntake ? (
         <>
           <h1 className="text-2xl font-bold tracking-tight">Tell me about you</h1>
-          <p className="mt-1.5 mb-6 text-sm text-muted">
-            Age, size, how much you move, what you&apos;re after. It calibrates
-            everything else — a portion is only big or small relative to the
-            person eating it. All optional, and only you see it.
+          <p className="mt-1.5 mb-7 text-sm text-muted">
+            Seven quick questions. It calibrates everything else — a portion is
+            only big or small relative to the person eating it. Skip anything you
+            would rather not answer.
           </p>
 
-          {canInterpret() && hand !== "1" ? (
-            <>
-              <IntakeStep
-                thisYear={Number(today.slice(0, 4))}
-                weightUnit={weightUnit(user.units)}
-                lengthUnit={lengthUnit(user.units)}
-              />
-              <p className="mt-4 text-center text-sm text-muted">
-                Or{" "}
-                <Link href="/onboarding?hand=1" className="font-medium text-accent">
-                  fill in the fields
-                </Link>{" "}
-                instead.
-              </p>
-            </>
-          ) : (
-            <ProfileFields user={user} today={today} submitLabel="Save and continue" />
-          )}
+          <IntakeSurvey
+            thisYear={Number(today.slice(0, 4))}
+            weightUnit={weightUnit(user.units)}
+            lengthUnit={lengthUnit(user.units)}
+          />
 
           <Link href="/onboarding?skip=1" className="btn-quiet mt-2 w-full">
             Skip for now
