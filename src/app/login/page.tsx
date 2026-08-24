@@ -4,6 +4,7 @@ import { crewByCode, crewRoster, currentUser } from "@/lib/data";
 import PinForm from "./PinForm";
 import JoinForm from "./JoinForm";
 import Avatar from "@/components/Avatar";
+import Wordmark from "@/components/Wordmark";
 
 export default async function LoginPage({
   searchParams,
@@ -19,13 +20,8 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight">
-          La<span className="text-accent">Flo</span>Fit
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Track the diet. Log the training. Answer to your friends.
-        </p>
+      <div className="mb-8">
+        <Wordmark />
       </div>
 
       {/* Step 1 — which crew? */}

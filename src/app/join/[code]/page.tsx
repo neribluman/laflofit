@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { crewByCode, crewRoster, currentUser } from "@/lib/data";
@@ -39,6 +40,14 @@ export default async function JoinPage({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
+      <Image
+        src="/logo-192.png"
+        alt=""
+        width={64}
+        height={64}
+        priority
+        className="mx-auto mb-5 rounded-2xl"
+      />
       <p className="text-center text-sm text-muted">You&apos;ve been invited to</p>
       <h1 className="mt-1 text-center text-3xl font-bold tracking-tight">
         {crew.name}

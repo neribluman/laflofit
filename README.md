@@ -202,6 +202,11 @@ then open <http://localhost:3000/laflofit>.
 
 ## Where things live
 
+The La Floresta boar is the app's mark — it's the favicon, the home-screen
+icon, and the logo on the sign-in and invite screens. Source lives in
+`src/app/icon.png` (favicon), `src/app/apple-icon.png`, and `public/logo-*.png`
+(the manifest and in-app logo). To change it, replace those four files.
+
 ```
 src/
   app/

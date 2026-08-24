@@ -2,17 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/data";
 import StartForm from "./StartForm";
+import Wordmark from "@/components/Wordmark";
 
 export default async function StartPage() {
   if (await currentUser()) redirect("/crew");
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Start a crew</h1>
-        <p className="mt-2 text-sm text-muted">
+      <div className="mb-8">
+        <Wordmark tagline={false} />
+        <p className="mt-4 text-center text-sm text-muted">
           Accountability needs an audience. Set yours up, then send round the
-          code.
+          link.
         </p>
       </div>
 
