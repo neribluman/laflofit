@@ -17,6 +17,7 @@ rules, so it works for any diet.
 | **Log** | Add workouts (type, minutes, how hard) and weigh-ins (weight, waist, body fat). |
 | **Crew** | Seven-day leaderboard, 30-day weight movement, and a feed of everything the crew logged — with emoji reactions and comments. |
 | **Me** | Your stats, a weight trend chart, settings, and a link to edit your plan. |
+| **Just tell me about your day** | A text box on Today. Write what you ate, how you trained and how it went in plain English; it reads that into rule ticks, workouts and a weigh-in, shows you what it understood, and only writes once you confirm. |
 | **Plan** | Add, edit and delete rules. Three kinds: *do it*, *avoid it*, *count it* (with a target). Rules can be daily or a once-a-week allowance, which is how the slow-carb cheat day works. |
 
 ---
@@ -29,6 +30,8 @@ rules, so it works for any diet.
   connection string as an environment variable.
 - **Sign-in is a crew code, your name, and a 4-digit PIN.** No email, no
   passwords, nothing to set up. See the honest note about this below.
+- **The Claude API for plain-English logging** — optional. No key, no text box;
+  everything else works the same.
 - **No ORM, no component library.** Fewer moving parts, and every file is plain
   enough to change by asking Claude.
 
@@ -79,7 +82,31 @@ npm run db:setup
 That generates a secret for signing login cookies, creates every table, and
 tells you how many it made. It's safe to run again — it never deletes anything.
 
-### 4. Run it
+### 4. Optional: plain-English logging
+
+Skip this and the app works fine — you just tick everything by hand.
+
+1. Go to [console.anthropic.com](https://console.anthropic.com) → **API keys** →
+   create one. This is the one account outside Vercel that the app needs.
+2. Add it to `.env.local`:
+
+   ```
+   ANTHROPIC_API_KEY=sk-ant-...
+   ```
+
+Then a text box appears on Today. Type something like *"eggs and coffee, chicken
+salad, caved and had a slice of bread, 3L water, ran 5k easy, 84.1kg"* and it
+works out which rules you met, logs the run and records the weigh-in.
+
+It always shows you what it understood before writing anything, and it never
+guesses — anything ambiguous goes in a "didn't know what to do with this" line
+for you to tick by hand.
+
+**Cost.** Each read is well under a cent. Five friends logging daily lands
+around $2 a month on the default model. For a cheaper, faster, more
+literal-minded read, set `ANTHROPIC_MODEL=claude-haiku-4-5`.
+
+### 5. Run it
 
 ```bash
 npm run dev
@@ -102,6 +129,7 @@ Then in the Vercel dashboard, **Settings → Environment Variables**, add:
 - `DATABASE_URL` — the same connection string (Vercel may add this for you when
   you connect the Neon database to the project)
 - `AUTH_SECRET` — copy the value `npm run db:setup` generated in `.env.local`
+- `ANTHROPIC_API_KEY` — only if you set up plain-English logging
 
 Redeploy, and you're live. Tell everyone to open the site on their phone and
 use **Add to Home Screen** — it runs full-screen, like an app.
@@ -131,6 +159,7 @@ src/
     db.ts             the database connection
     session.ts        the signed login cookie
     pin.ts            PIN hashing
+    interpret.ts      the Claude call that reads plain English into log entries
     presets.ts        the built-in plans — edit these to change the starting rules
     scoring.ts        what counts as a perfect day, and how streaks work
     data.ts           every database read

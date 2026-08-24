@@ -8,9 +8,12 @@ import {
 } from "@/lib/data";
 import { addDays, lastNDays, prettyDate, startOfWeek, todayIn } from "@/lib/dates";
 import { currentStreak, scoreDay } from "@/lib/scoring";
+import { canInterpret } from "@/lib/interpret";
+import { weightUnit } from "@/lib/units";
 import ScoreRing from "@/components/ScoreRing";
 import WeekStrip, { type StripDay } from "@/components/WeekStrip";
 import CheckInList from "./CheckInList";
+import NaturalLog from "./NaturalLog";
 import DayNote from "./DayNote";
 
 export default async function TodayPage({
@@ -124,6 +127,10 @@ export default async function TodayPage({
       </header>
 
       <WeekStrip days={strip} selected={date} />
+
+      {canInterpret() && (
+        <NaturalLog key={date} date={date} weightUnit={weightUnit(user.units)} />
+      )}
 
       {rules.length === 0 ? (
         <div className="card p-6 text-center">
