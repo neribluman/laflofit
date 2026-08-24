@@ -76,6 +76,19 @@ export type Measurement = {
   notes: string | null;
 };
 
+export type Exercise = {
+  id: string;
+  workout_id: string;
+  name: string;
+  sets: number | null;
+  reps: number | null;
+  weight_kg: number | null;
+  distance_km: number | null;
+  minutes: number | null;
+  notes: string | null;
+  sort_order: number;
+};
+
 export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack" | "drink";
 
 export type Meal = {

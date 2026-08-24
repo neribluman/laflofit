@@ -24,3 +24,13 @@ export function fmtWeight(kg: number | null, units: Units): string {
   if (kg == null) return "—";
   return `${kgToDisplay(kg, units).toFixed(1)} ${weightUnit(units)}`;
 }
+
+const MI_PER_KM = 0.621371192;
+
+export function kmToDisplay(km: number, units: Units): number {
+  return units === "imperial" ? km * MI_PER_KM : km;
+}
+export function displayToKm(v: number, units: Units): number {
+  return units === "imperial" ? v / MI_PER_KM : v;
+}
+export const distanceUnit = (units: Units) => (units === "imperial" ? "mi" : "km");

@@ -2,6 +2,7 @@ import { sql, sqlOne } from "./db";
 import { sessionUserId } from "./session";
 import type {
   Comment,
+  Exercise,
   Meal,
   Crew,
   DayLog,
@@ -170,5 +171,19 @@ export async function mealsBetween(
     where user_id = any(${userIds}::uuid[])
       and meal_date between ${from}::date and ${to}::date
     order by meal_date desc, created_at
+  `;
+}
+
+export async function exercisesForWorkouts(
+  workoutIds: string[],
+): Promise<Exercise[]> {
+  if (workoutIds.length === 0) return [];
+  return sql<Exercise>`
+    select id, workout_id, name, sets, reps,
+           weight_kg::float8 as weight_kg, distance_km::float8 as distance_km,
+           minutes, notes, sort_order
+    from exercises
+    where workout_id = any(${workoutIds}::uuid[])
+    order by sort_order
   `;
 }

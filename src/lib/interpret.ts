@@ -149,3 +149,91 @@ export async function interpretDay({
   return { ...parsed, rules: parsed.rules.filter((r) => known.has(r.rule_id)) };
 }
 
+
+// ---------------------------------------------------------------------------
+// Training
+// ---------------------------------------------------------------------------
+
+const WorkoutReport = z.object({
+  workouts: z.array(
+    z.object({
+      kind: z.enum(WORKOUT_KINDS),
+      minutes: z
+        .number()
+        .nullable()
+        .describe("total session length if stated or clearly implied"),
+      intensity: z.enum(["easy", "moderate", "hard"]),
+      notes: z.string().nullable(),
+      exercises: z.array(
+        z.object({
+          name: z.string().describe("the movement, e.g. 'Back squat', '5k run'"),
+          sets: z.number().nullable(),
+          reps: z.number().nullable().describe("reps per set, not the total"),
+          weight: z
+            .number()
+            .nullable()
+            .describe("load per rep, in the units they used"),
+          distance: z
+            .number()
+            .nullable()
+            .describe("distance covered, in the units they used"),
+          minutes: z.number().nullable(),
+          notes: z.string().nullable(),
+        }),
+      ),
+    }),
+  ),
+  unclear: z.array(z.string()),
+});
+
+export type WorkoutReport = z.infer<typeof WorkoutReport>;
+export type ReportedExercise = WorkoutReport["workouts"][number]["exercises"][number];
+
+const WORKOUT_SYSTEM = `You turn a person's description of a training session into structured entries.
+
+Read gym shorthand the way a training partner would:
+- "5x5 squats at 100" is five sets of five reps at 100 per rep. Sets come first, reps second.
+- "3x8-10" means three sets, and reps are a range — take the lower number.
+- "bench 70kg 3x8" is the same information in a different order. Work out which number is the load.
+- "ran 5k in 25 min" is one exercise with a distance and a time, not five sets.
+- "AMRAP", "to failure" or "a few sets" mean reps are unknown — leave reps null and say so in the exercise notes rather than guessing a number.
+- Bodyweight movements have no weight. Leave it null; do not put their bodyweight there.
+
+One workout per distinct session. A gym session and an evening run are two workouts; squats and bench inside one gym session are two exercises in one workout.
+
+Pick the closest kind from the list. A session that is mostly lifting is Strength even if it ended on a bike.
+
+Session length: use what they say. Add up per-exercise times only when those times cover the whole session. If one exercise happens to have a time and the rest do not, that time is NOT the session length — leave minutes null. A missing number is better than a wrong one, and an hour of lifting logged as "15 min" because the bike was the only timed part is wrong.
+
+Intensity: take their word for it — "felt easy", "brutal", "tough". Default to moderate when they say nothing.
+
+Use "unclear" only for things you could not act on at all.`;
+
+export async function interpretWorkout({
+  text,
+  units,
+}: {
+  text: string;
+  units: Units;
+}): Promise<WorkoutReport> {
+  const client = new Anthropic();
+
+  const response = await client.messages.parse({
+    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
+    max_tokens: 8000,
+    system: WORKOUT_SYSTEM,
+    output_config: { effort: "medium", format: zodOutputFormat(WorkoutReport) },
+    messages: [
+      {
+        role: "user",
+        content: `They use ${weightUnit(units)} for weight and ${
+          units === "imperial" ? "miles" : "kilometres"
+        } for distance.\n\nTheir session:\n"""\n${text}\n"""`,
+      },
+    ],
+  });
+
+  const parsed = response.parsed_output;
+  if (!parsed) throw new Error("Could not read that. Try rephrasing?");
+  return parsed;
+}

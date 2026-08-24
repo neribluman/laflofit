@@ -130,6 +130,28 @@ create table if not exists measurements (
 );
 
 -- ---------------------------------------------------------------------------
+-- What the workout actually consisted of
+--
+-- Hangs off a workout, so deleting the session takes its exercises with it.
+-- Weights are kg and distances km, converted at the edges like everything else.
+-- ---------------------------------------------------------------------------
+
+create table if not exists exercises (
+  id          uuid primary key default gen_random_uuid(),
+  workout_id  uuid not null references workouts(id) on delete cascade,
+  name        text not null,
+  sets        int,
+  reps        int,
+  weight_kg   numeric,
+  distance_km numeric,
+  minutes     int,
+  notes       text,
+  sort_order  int not null default 0
+);
+
+create index if not exists exercises_workout_idx on exercises (workout_id, sort_order);
+
+-- ---------------------------------------------------------------------------
 -- What they actually ate
 --
 -- Separate from plan rules on purpose: rules are opinions about a diet, meals

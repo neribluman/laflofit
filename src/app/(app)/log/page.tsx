@@ -1,7 +1,22 @@
 import { redirect } from "next/navigation";
-import { currentUser, measurementsFor, workoutsBetween } from "@/lib/data";
+import {
+  currentUser,
+  exercisesForWorkouts,
+  measurementsFor,
+  workoutsBetween,
+} from "@/lib/data";
 import { addDays, prettyDate, todayIn } from "@/lib/dates";
-import { fmtWeight, cmToDisplay, lengthUnit, weightUnit } from "@/lib/units";
+import {
+  cmToDisplay,
+  distanceUnit,
+  fmtWeight,
+  kgToDisplay,
+  kmToDisplay,
+  lengthUnit,
+  weightUnit,
+} from "@/lib/units";
+import { canInterpret } from "@/lib/interpret";
+import { describeExercise } from "@/lib/exercise-format";
 import { WORKOUT_KINDS } from "@/lib/presets";
 import {
   addWorkout,
@@ -10,6 +25,7 @@ import {
   saveMeasurement,
 } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
+import WorkoutLog from "./WorkoutLog";
 
 export default async function LogPage() {
   const user = await currentUser();
@@ -20,15 +36,206 @@ export default async function LogPage() {
     workoutsBetween([user.id], addDays(today, -20), today),
     measurementsFor([user.id]),
   ]);
+  const exercises = await exercisesForWorkouts(workouts.map((w) => w.id));
+  const byWorkout = new Map<string, typeof exercises>();
+  for (const exercise of exercises) {
+    byWorkout.set(exercise.workout_id, [
+      ...(byWorkout.get(exercise.workout_id) ?? []),
+      exercise,
+    ]);
+  }
+
   const recentWeights = measurements.slice(-8).reverse();
+  const weight = weightUnit(user.units);
+  const distance = distanceUnit(user.units);
 
   return (
     <main className="space-y-8">
       <h1 className="text-2xl font-bold tracking-tight">Log</h1>
 
+      {canInterpret() && (
+        <section>
+          <h2 className="label">Today&apos;s training</h2>
+          <WorkoutLog today={today} weightUnit={weight} distanceUnit={distance} />
+        </section>
+      )}
+
       <section>
-        <h2 className="label">Add a workout</h2>
-        <form action={addWorkout} className="card space-y-4 p-4">
+        <h2 className="label">Last 3 weeks of training</h2>
+        {workouts.length === 0 ? (
+          <p className="card p-4 text-sm text-muted">
+            Nothing logged yet. The first one is the hard one.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {workouts.map((w) => {
+              const moves = byWorkout.get(w.id) ?? [];
+              return (
+                <li key={w.id} className="card p-3.5">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">
+                        {w.kind}
+                        {w.minutes ? (
+                          <span className="nums text-muted"> · {w.minutes} min</span>
+                        ) : null}
+                        <span className="text-muted"> · {w.intensity}</span>
+                      </p>
+                      <p className="text-xs text-muted">
+                        {prettyDate(w.workout_date, today)}
+                        {w.notes ? ` — ${w.notes}` : ""}
+                      </p>
+                    </div>
+                    <form action={deleteWorkout.bind(null, w.id)}>
+                      <button
+                        className="btn-quiet px-2 py-1 text-xs"
+                        aria-label={`Delete ${w.kind} on ${w.workout_date}`}
+                      >
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+
+                  {moves.length > 0 && (
+                    <ul className="mt-2 space-y-1 border-t border-line pt-2">
+                      {moves.map((move) => (
+                        <li key={move.id} className="flex gap-2 text-xs">
+                          <span className="min-w-0 flex-1 truncate">{move.name}</span>
+                          <span className="nums shrink-0 text-muted">
+                            {describeExercise(
+                              {
+                                sets: move.sets,
+                                reps: move.reps,
+                                weight:
+                                  move.weight_kg == null
+                                    ? null
+                                    : kgToDisplay(move.weight_kg, user.units),
+                                distance:
+                                  move.distance_km == null
+                                    ? null
+                                    : kmToDisplay(move.distance_km, user.units),
+                                minutes: move.minutes,
+                              },
+                              weight,
+                              distance,
+                            ) || "—"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="label">Weigh-in</h2>
+        <form action={saveMeasurement} className="card space-y-4 p-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label" htmlFor="weight">
+                Weight ({weight})
+              </label>
+              <input
+                id="weight"
+                name="weight"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                placeholder="—"
+                className="field nums"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="measured_on">
+                Date
+              </label>
+              <input
+                id="measured_on"
+                name="measured_on"
+                type="date"
+                defaultValue={today}
+                max={today}
+                required
+                className="field nums"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="waist">
+                Waist ({lengthUnit(user.units)})
+              </label>
+              <input
+                id="waist"
+                name="waist"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                placeholder="optional"
+                className="field nums"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="body_fat">
+                Body fat (%)
+              </label>
+              <input
+                id="body_fat"
+                name="body_fat"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                placeholder="optional"
+                className="field nums"
+              />
+            </div>
+          </div>
+          <SubmitButton pendingLabel="Saving…">Save weigh-in</SubmitButton>
+          <p className="text-xs text-muted">
+            One entry per day — saving again replaces that day&apos;s numbers.
+          </p>
+        </form>
+      </section>
+
+      {recentWeights.length > 0 && (
+        <section>
+          <h2 className="label">Recent weigh-ins</h2>
+          <ul className="card divide-y divide-line">
+            {recentWeights.map((m) => (
+              <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                <span className="flex-1 text-muted">
+                  {prettyDate(m.measured_on, today)}
+                </span>
+                <span className="nums font-semibold">
+                  {fmtWeight(m.weight_kg, user.units)}
+                </span>
+                {m.waist_cm != null && (
+                  <span className="nums text-xs text-muted">
+                    {cmToDisplay(m.waist_cm, user.units).toFixed(1)}{" "}
+                    {lengthUnit(user.units)}
+                  </span>
+                )}
+                <form action={deleteMeasurement.bind(null, m.id)}>
+                  <button
+                    className="btn-quiet px-1 py-1 text-xs"
+                    aria-label={`Delete weigh-in from ${m.measured_on}`}
+                  >
+                    Delete
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <details className="card p-4">
+        <summary className="cursor-pointer text-sm font-medium text-muted">
+          Add a workout by hand
+        </summary>
+        <form action={addWorkout} className="mt-4 space-y-4">
           <div className="grid grid-cols-4 gap-1.5">
             {WORKOUT_KINDS.map((kind, i) => (
               <label
@@ -110,144 +317,7 @@ export default async function LogPage() {
           />
           <SubmitButton pendingLabel="Adding…">Add workout</SubmitButton>
         </form>
-      </section>
-
-      <section>
-        <h2 className="label">Weigh-in</h2>
-        <form action={saveMeasurement} className="card space-y-4 p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label" htmlFor="weight">
-                Weight ({weightUnit(user.units)})
-              </label>
-              <input
-                id="weight"
-                name="weight"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                placeholder="—"
-                className="field nums"
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="measured_on">
-                Date
-              </label>
-              <input
-                id="measured_on"
-                name="measured_on"
-                type="date"
-                defaultValue={today}
-                max={today}
-                required
-                className="field nums"
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="waist">
-                Waist ({lengthUnit(user.units)})
-              </label>
-              <input
-                id="waist"
-                name="waist"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                placeholder="optional"
-                className="field nums"
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="body_fat">
-                Body fat (%)
-              </label>
-              <input
-                id="body_fat"
-                name="body_fat"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                placeholder="optional"
-                className="field nums"
-              />
-            </div>
-          </div>
-          <SubmitButton pendingLabel="Saving…">Save weigh-in</SubmitButton>
-          <p className="text-xs text-muted">
-            One entry per day — saving again replaces that day&apos;s numbers.
-          </p>
-        </form>
-      </section>
-
-      <section>
-        <h2 className="label">Last 3 weeks of training</h2>
-        {workouts.length === 0 ? (
-          <p className="card p-4 text-sm text-muted">
-            Nothing logged yet. The first one is the hard one.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {workouts.map((w) => (
-              <li key={w.id} className="card flex items-center gap-3 p-3.5">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">
-                    {w.kind}
-                    {w.minutes ? (
-                      <span className="nums text-muted"> · {w.minutes} min</span>
-                    ) : null}
-                    <span className="text-muted"> · {w.intensity}</span>
-                  </p>
-                  <p className="text-xs text-muted">
-                    {prettyDate(w.workout_date, today)}
-                    {w.notes ? ` — ${w.notes}` : ""}
-                  </p>
-                </div>
-                <form action={deleteWorkout.bind(null, w.id)}>
-                  <button
-                    className="btn-quiet px-2 py-1 text-xs"
-                    aria-label={`Delete ${w.kind} on ${w.workout_date}`}
-                  >
-                    Delete
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {recentWeights.length > 0 && (
-        <section>
-          <h2 className="label">Recent weigh-ins</h2>
-          <ul className="card divide-y divide-line">
-            {recentWeights.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                <span className="flex-1 text-muted">
-                  {prettyDate(m.measured_on, today)}
-                </span>
-                <span className="nums font-semibold">
-                  {fmtWeight(m.weight_kg, user.units)}
-                </span>
-                {m.waist_cm != null && (
-                  <span className="nums text-xs text-muted">
-                    {cmToDisplay(m.waist_cm, user.units).toFixed(1)}{" "}
-                    {lengthUnit(user.units)}
-                  </span>
-                )}
-                <form action={deleteMeasurement.bind(null, m.id)}>
-                  <button
-                    className="btn-quiet px-1 py-1 text-xs"
-                    aria-label={`Delete weigh-in from ${m.measured_on}`}
-                  >
-                    Delete
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      </details>
     </main>
   );
 }

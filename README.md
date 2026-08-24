@@ -14,7 +14,7 @@ rules, so it works for any diet.
 | Screen | What's on it |
 |---|---|
 | **Today** | Your plan's rules as a checklist, a day score, a streak, and the last 7 days at a glance. Tap back through previous days to fill in what you missed. |
-| **Log** | Add workouts (type, minutes, how hard) and weigh-ins (weight, waist, body fat). |
+| **Log** | Its own free-text box for training: *"squats 5x5 at 100kg, bench 3x8 at 70, pull-ups 3 sets to failure, then 15 min on the bike"* becomes individual exercises with sets, reps and load, so you can watch lifts move over time. Weigh-ins and a by-hand workout form live here too. |
 | **Crew** | Seven-day leaderboard, 30-day weight movement, and a feed of everything the crew logged — with emoji reactions and comments. |
 | **Me** | Your stats, a weight trend chart, settings, and a link to edit your plan. |
 | **Just tell me about your day** | A text box on Today. Write what you ate, how you trained and how it went in plain English. It logs **every food and drink with estimated calories, protein, carbs, fat and fibre** — whatever your plan happens to be about — plus rule ticks, workouts and a weigh-in. Shows you what it understood, and only writes once you confirm. |
@@ -162,7 +162,7 @@ src/
     db.ts             the database connection
     session.ts        the signed login cookie
     pin.ts            PIN hashing
-    interpret.ts      the Claude call that reads plain English into log entries
+    interpret.ts      the two Claude calls: one reads a day, one reads a session
     presets.ts        the built-in plans — edit these to change the starting rules
     scoring.ts        what counts as a perfect day, and how streaks work
     data.ts           every database read
