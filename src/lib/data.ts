@@ -25,7 +25,8 @@ export async function currentUser(): Promise<User | null> {
   return sqlOne<User>`
     select id, crew_id, display_name, emoji, units, timezone,
            height_cm::float8 as height_cm, birth_year, sex, activity_level,
-           goal_weight_kg::float8 as goal_weight_kg, about, active_plan_id,
+           goal_weight_kg::float8 as goal_weight_kg, about,
+           (avatar is not null) as has_avatar, active_plan_id,
            created_at::text as created_at
     from users where id = ${id}
   `;
@@ -49,7 +50,8 @@ export async function crewRoster(crewId: string): Promise<User[]> {
   return sql<User>`
     select id, crew_id, display_name, emoji, units, timezone,
            height_cm::float8 as height_cm, birth_year, sex, activity_level,
-           goal_weight_kg::float8 as goal_weight_kg, about, active_plan_id,
+           goal_weight_kg::float8 as goal_weight_kg, about,
+           (avatar is not null) as has_avatar, active_plan_id,
            created_at::text as created_at
     from users
     where crew_id = ${crewId}

@@ -25,6 +25,7 @@ import {
   strengthBoard,
 } from "@/lib/boards";
 import Link from "next/link";
+import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
 import InviteCode from "./InviteCode";
@@ -127,6 +128,7 @@ export default async function CrewPage() {
         id: member.id,
         name: member.display_name,
         emoji: member.emoji,
+        hasAvatar: member.has_avatar,
         isMe: member.id === user.id,
         standing,
         boards: {
@@ -280,7 +282,14 @@ export default async function CrewPage() {
                     : "border-line bg-surface-2 text-muted"
                 }`}
               >
-                <span aria-hidden>{row.emoji}</span>
+                <Avatar
+                  user={{
+                    id: row.id,
+                    emoji: row.emoji,
+                    display_name: row.name,
+                    has_avatar: row.hasAvatar,
+                  }}
+                />
                 <span className="truncate">{row.name}</span>
                 <span aria-hidden className={row.standing.loggedToday ? "text-accent" : ""}>
                   {row.standing.loggedToday ? "✓" : "·"}
@@ -343,7 +352,7 @@ export default async function CrewPage() {
               return (
                 <li key={item.key} className="card p-4">
                   <div className="flex items-baseline gap-2">
-                    <span aria-hidden>{who?.emoji ?? "•"}</span>
+                    {who && <Avatar user={who} />}
                     <p className="min-w-0 flex-1 text-sm">
                       <span className="font-semibold">
                         {who?.display_name ?? "Someone"}

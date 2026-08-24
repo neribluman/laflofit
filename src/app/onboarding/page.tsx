@@ -57,7 +57,7 @@ export default async function Onboarding({
         <>
           <h1 className="text-2xl font-bold tracking-tight">Tell me about you</h1>
           <p className="mt-1.5 mb-7 text-sm text-muted">
-            Seven quick questions. It calibrates everything else — a portion is
+            Eight quick questions. It calibrates everything else — a portion is
             only big or small relative to the person eating it. Skip anything you
             would rather not answer.
           </p>
@@ -66,6 +66,7 @@ export default async function Onboarding({
             thisYear={Number(today.slice(0, 4))}
             weightUnit={weightUnit(user.units)}
             lengthUnit={lengthUnit(user.units)}
+            emoji={user.emoji}
           />
 
           <Link href="/onboarding?skip=1" className="btn-quiet mt-2 w-full">

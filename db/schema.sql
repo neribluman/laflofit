@@ -235,3 +235,10 @@ alter table users add column if not exists activity_level text; -- 'sedentary' |
 alter table users add column if not exists goal_weight_kg numeric;
 -- Free-form: goals, dietary restrictions, injuries, anything worth knowing.
 alter table users add column if not exists about text;
+
+-- Profile photo, as a data URL. Kept in the row rather than in blob storage
+-- because it is resized to a 256px square before it ever leaves the browser —
+-- about 20KB — and one per person is not worth another service to configure.
+-- Served through /avatar/[id] so pages reference a URL the browser caches,
+-- rather than carrying the bytes in every render.
+alter table users add column if not exists avatar text;

@@ -47,6 +47,8 @@ export async function saveProfileFields(formData: FormData) {
 }
 
 export type IntakeAnswers = {
+  /** Marker only. The photo saves itself the moment it's taken. */
+  photo: string;
   age: string;
   sex: string;
   height: string;
@@ -98,5 +100,28 @@ export async function saveIntake(answers: IntakeAnswers, thisYear: number) {
     `;
   }
 
+  revalidatePath("/", "layout");
+}
+
+/** Store a photo. Already a 256px square by the time it gets here. */
+export async function saveAvatar(dataUrl: string): Promise<{ error?: string }> {
+  const user = await requireUser();
+
+  if (!/^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)) {
+    return { error: "That doesn't look like an image." };
+  }
+  // A 256px JPEG is ~20KB; anything past 500KB did not come from our resizer.
+  if (dataUrl.length > 500_000) {
+    return { error: "That image is too big. Try taking it again." };
+  }
+
+  await sql`update users set avatar = ${dataUrl} where id = ${user.id}`;
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export async function removeAvatar() {
+  const user = await requireUser();
+  await sql`update users set avatar = null where id = ${user.id}`;
   revalidatePath("/", "layout");
 }

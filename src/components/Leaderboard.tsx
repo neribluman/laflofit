@@ -4,11 +4,13 @@ import { useState } from "react";
 import { weekdayLetter } from "@/lib/dates";
 import type { WeekStanding } from "@/lib/scoring";
 import type { BoardEntry, BoardKey } from "@/lib/boards";
+import Avatar from "./Avatar";
 
 export type LeaderRow = {
   id: string;
   name: string;
   emoji: string;
+  hasAvatar: boolean;
   isMe: boolean;
   standing: WeekStanding;
   boards: Record<BoardKey, BoardEntry>;
@@ -103,7 +105,14 @@ export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
                       <span className="nums text-xs text-muted">{i + 1}</span>
                     )}
                   </span>
-                  <span aria-hidden>{row.emoji}</span>
+                  <Avatar
+                    user={{
+                      id: row.id,
+                      emoji: row.emoji,
+                      display_name: row.name,
+                      has_avatar: row.hasAvatar,
+                    }}
+                  />
                   <span
                     className={`min-w-0 flex-1 truncate ${row.isMe ? "font-semibold" : ""} ${
                       entry.missing ? "text-muted" : ""

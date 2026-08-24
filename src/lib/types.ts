@@ -23,6 +23,8 @@ export type User = {
   activity_level: "sedentary" | "light" | "moderate" | "very" | null;
   goal_weight_kg: number | null;
   about: string | null;
+  /** Whether a photo exists — never the bytes, which come from /avatar/[id]. */
+  has_avatar: boolean;
   active_plan_id: string | null;
   created_at: string;
 };

@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { saveIntake, type IntakeAnswers } from "@/app/(app)/profile-actions";
 import { ACTIVITY_LEVELS } from "@/lib/profile";
+import AvatarPicker from "@/components/AvatarPicker";
 
-type StepKind = "number" | "choice" | "text";
+type StepKind = "number" | "choice" | "text" | "photo";
 
 type Step = {
   key: keyof IntakeAnswers;
@@ -18,6 +19,7 @@ type Step = {
 };
 
 const EMPTY: IntakeAnswers = {
+  photo: "",
   age: "",
   sex: "",
   height: "",
@@ -31,13 +33,21 @@ export default function IntakeSurvey({
   thisYear,
   weightUnit,
   lengthUnit,
+  emoji,
 }: {
   thisYear: number;
   weightUnit: string;
   lengthUnit: string;
+  emoji: string;
 }) {
   const router = useRouter();
   const steps: Step[] = [
+    {
+      key: "photo",
+      kind: "photo",
+      question: "Put a face to the name",
+      note: "Your crew sees this next to your score every day. It saves as soon as you take it.",
+    },
     {
       key: "age",
       kind: "number",
@@ -194,6 +204,10 @@ export default function IntakeSurvey({
             </div>
           )}
 
+          {step.kind === "photo" && (
+            <AvatarPicker emoji={emoji} onSaved={() => set("done")} />
+          )}
+
           {step.kind === "text" && (
             <textarea
               autoFocus
@@ -210,7 +224,15 @@ export default function IntakeSurvey({
 
         {step.kind !== "choice" && (
           <button onClick={advance} disabled={saving} className="btn-primary mt-5 w-full">
-            {saving ? "Saving…" : last ? "Done" : value ? "Continue" : "Skip"}
+            {saving
+              ? "Saving…"
+              : last
+                ? "Done"
+                : value
+                  ? step.kind === "photo"
+                    ? "Looks good"
+                    : "Continue"
+                  : "Skip"}
           </button>
         )}
       </div>

@@ -26,6 +26,8 @@ import {
 import TrendLine from "@/components/TrendLine";
 import { deleteMeasurement, deleteWorkout, signOut, updateProfile } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
+import Avatar from "@/components/Avatar";
+import AvatarPicker from "@/components/AvatarPicker";
 import BiomarkerForm from "./BiomarkerForm";
 import ProfileFields from "@/components/ProfileFields";
 import BiomarkerGrid from "./BiomarkerGrid";
@@ -111,7 +113,7 @@ export default async function MePage() {
   return (
     <main className="mx-auto max-w-lg space-y-8 lg:max-w-2xl">
       <header className="flex items-center gap-3">
-        <span className="text-3xl">{user.emoji}</span>
+        <Avatar user={user} size="lg" />
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold tracking-tight">
             {user.display_name}
@@ -304,6 +306,16 @@ export default async function MePage() {
       </section>
 
       <section>
+        <h2 className="label">Photo</h2>
+        <div className="card p-5">
+          <AvatarPicker emoji={user.emoji} />
+          <p className="mt-3 text-center text-xs text-muted">
+            Your crew sees this next to your score. Saves as soon as you take it.
+          </p>
+        </div>
+      </section>
+
+      <section>
         <h2 className="label">Settings</h2>
         <form action={updateProfile} className="card space-y-4 p-4">
           <div>
@@ -323,6 +335,9 @@ export default async function MePage() {
             <label className="label" htmlFor="emoji">
               Your mark
             </label>
+            <p className="mb-1.5 text-xs text-muted">
+              Shown when you have no photo.
+            </p>
             <input
               id="emoji"
               name="emoji"
