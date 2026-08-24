@@ -36,9 +36,9 @@ export default async function Onboarding({
   // The survey is a screen of its own: one question at a time, and nothing
   // standing above it repeating itself. The plan step keeps a normal page.
   if (onIntake) {
+    // Top-aligned rather than centred: the steps are different heights, and
+    // centring would make the question jump up and down between them.
     return (
-      {/* Top-aligned on purpose: the steps are different heights, and
-          centring would make the question jump up and down between them. */}
       <main className="mx-auto w-full max-w-md px-5 pt-10 pb-16">
         <IntakeSurvey
           thisYear={Number(today.slice(0, 4))}
