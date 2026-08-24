@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { saveIntake, type IntakeAnswers } from "@/app/(app)/profile-actions";
@@ -33,10 +34,12 @@ export default function IntakeSurvey({
   thisYear,
   weightUnit,
   lengthUnit,
+  skipAllHref,
 }: {
   thisYear: number;
   weightUnit: string;
   lengthUnit: string;
+  skipAllHref: string;
 }) {
   const router = useRouter();
   const steps: Step[] = [
@@ -243,6 +246,14 @@ export default function IntakeSurvey({
           </button>
         )}
       </div>
+
+      {/* Only on the first question: the way out belongs before anyone has
+          invested anything, not repeated under every screen. */}
+      {index === 0 && (
+        <Link href={skipAllHref} className="btn-quiet mt-8 w-full text-xs">
+          Skip all of this and pick a plan
+        </Link>
+      )}
     </div>
   );
 }
