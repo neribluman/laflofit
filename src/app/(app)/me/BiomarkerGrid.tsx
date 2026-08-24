@@ -1,5 +1,5 @@
 import { cmToDisplay, kgToDisplay, lengthUnit, weightUnit } from "@/lib/units";
-import { ageFrom, energyEstimate } from "@/lib/profile";
+import { ageFrom, energyEstimate, missingForEnergy } from "@/lib/profile";
 import type { Measurement, User } from "@/lib/types";
 
 function Tile({
@@ -53,13 +53,15 @@ export default function BiomarkerGrid({
       ? weight.value / (heightCm / 100) ** 2
       : null;
 
+  const age = ageFrom(user.birth_year, today);
   const energy = energyEstimate({
     weightKg: weight?.value ?? null,
     heightCm,
-    age: ageFrom(user.birth_year, today),
+    age,
     sex: user.sex,
     activity: user.activity_level,
   });
+  const blocking = missingForEnergy(user, weight?.value ?? null, today);
 
   const tiles = [
     weight && {
@@ -91,10 +93,13 @@ export default function BiomarkerGrid({
           ? `${Math.abs(kgToDisplay(weight.value - user.goal_weight_kg, units)).toFixed(1)} to go`
           : undefined,
     },
+    age && { label: "Age", value: String(age) },
     energy && {
       label: "Maintenance",
       value: `${energy.maintenance.toLocaleString()} kcal`,
-      sub: `at rest ${energy.bmr.toLocaleString()}`,
+      sub: energy.approximate
+        ? "rough — sex not given"
+        : `at rest ${energy.bmr.toLocaleString()}`,
     },
   ].filter(Boolean) as { label: string; value: string; sub?: string }[];
 
@@ -109,10 +114,20 @@ export default function BiomarkerGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2.5">
-      {tiles.map((tile) => (
-        <Tile key={tile.label} {...tile} />
-      ))}
+    <div className="space-y-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
+        {tiles.map((tile) => (
+          <Tile key={tile.label} {...tile} />
+        ))}
+      </div>
+
+      {!energy && blocking.length > 0 && (
+        <p className="card p-3.5 text-xs text-muted">
+          Add {blocking.join(" and ")} below and you&apos;ll get a
+          maintenance-calorie estimate, and a place on the crew&apos;s calorie
+          board.
+        </p>
+      )}
     </div>
   );
 }

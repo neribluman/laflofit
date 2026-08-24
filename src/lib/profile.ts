@@ -22,9 +22,29 @@ export function ageFrom(birthYear: number | null, today: string): number | null 
 }
 
 /**
- * Mifflin-St Jeor, the usual estimate. Needs weight, height, age and sex —
- * without all four there is no honest number to show, so it returns null
- * rather than guessing at the missing piece.
+ * Which of the four inputs the energy estimate is still waiting on. Saying
+ * "add age and height" when the missing thing is sex helps nobody.
+ */
+export function missingForEnergy(
+  user: Pick<User, "height_cm" | "birth_year" | "sex">,
+  weightKg: number | null,
+  today: string,
+): string[] {
+  const missing: string[] = [];
+  if (!weightKg) missing.push("a weigh-in");
+  if (!user.height_cm) missing.push("your height");
+  if (!ageFrom(user.birth_year, today)) missing.push("your age");
+  if (!user.sex) missing.push("your sex");
+  return missing;
+}
+
+/**
+ * Mifflin-St Jeor, the usual estimate.
+ *
+ * The formula splits on sex by a flat 166 kcal. Someone who declined to say
+ * gets the midpoint rather than being locked out of every calorie feature
+ * forever — flagged approximate, because it is. Leaving it unanswered is
+ * different from declining, and still asks.
  */
 export function energyEstimate({
   weightKg,
@@ -38,14 +58,19 @@ export function energyEstimate({
   age: number | null;
   sex: User["sex"];
   activity: User["activity_level"];
-}): { bmr: number; maintenance: number } | null {
-  if (!weightKg || !heightCm || !age || !sex || sex === "other") return null;
+}): { bmr: number; maintenance: number; approximate: boolean } | null {
+  if (!weightKg || !heightCm || !age || !sex) return null;
 
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  const bmr = sex === "male" ? base + 5 : base - 161;
+  const bmr =
+    sex === "male" ? base + 5 : sex === "female" ? base - 161 : base - 78;
   const factor = ACTIVITY_FACTOR[activity ?? "light"] ?? 1.375;
 
-  return { bmr: Math.round(bmr), maintenance: Math.round(bmr * factor) };
+  return {
+    bmr: Math.round(bmr),
+    maintenance: Math.round(bmr * factor),
+    approximate: sex === "other",
+  };
 }
 
 /**

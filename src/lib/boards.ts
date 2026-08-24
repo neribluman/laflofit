@@ -1,5 +1,5 @@
 import type { Exercise, Meal, PlanRule, User } from "./types";
-import { energyEstimate, ageFrom } from "./profile";
+import { energyEstimate, ageFrom, missingForEnergy } from "./profile";
 
 /**
  * The big barbell lifts, matched loosely because the names come out of free
@@ -95,7 +95,13 @@ export function calorieBoard(
 
   const target = explicit ?? estimate?.maintenance ?? null;
   if (!target) {
-    return { ...NOTHING, detail: "set a calorie rule, or add age and height" };
+    const missing = missingForEnergy(user, weightKg, today);
+    return {
+      ...NOTHING,
+      detail: missing.length
+        ? `needs ${missing.join(" and ")}`
+        : "needs a calorie target",
+    };
   }
 
   const byDate = new Map<string, number>();
