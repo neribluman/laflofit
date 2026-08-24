@@ -6,6 +6,8 @@ import {
   currentUser,
   dayLogsBetween,
   entriesForLogs,
+  exercisesForWorkouts,
+  mealsBetween,
   measurementsFor,
   reactionsFor,
   rulesForPlans,
@@ -17,6 +19,11 @@ import { scoreDay, standingFor } from "@/lib/scoring";
 import { kgToDisplay, weightUnit } from "@/lib/units";
 import type { PlanRule } from "@/lib/types";
 import Leaderboard, { type LeaderRow } from "@/components/Leaderboard";
+import {
+  calorieBoard,
+  proteinBoard,
+  strengthBoard,
+} from "@/lib/boards";
 import Link from "next/link";
 import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
@@ -45,11 +52,14 @@ export default async function CrewPage() {
   const roster = await crewRoster(crew.id);
   const ids = roster.map((member) => member.id);
 
-  const [logs, workouts, measurements] = await Promise.all([
+  const [logs, workouts, measurements, meals] = await Promise.all([
     dayLogsBetween(ids, monthAgo, today),
     workoutsBetween(ids, monthAgo, today),
     measurementsFor(ids),
+    mealsBetween(ids, addDays(today, -6), today),
   ]);
+  const exercises = await exercisesForWorkouts(workouts.map((w) => w.id));
+  const workoutOwner = new Map(workouts.map((w) => [w.id, w.user_id]));
 
   // Everyone can be on a different plan, so score each log against its own rules.
   const planIds = [
@@ -97,12 +107,39 @@ export default async function CrewPage() {
           ]),
       );
 
+      // Latest weight on file — every relative board needs it.
+      const weightKg =
+        [...measurements]
+          .reverse()
+          .find((m) => m.user_id === member.id && m.weight_kg != null)?.weight_kg ??
+        null;
+
+      const theirMeals = meals.filter((meal) => meal.user_id === member.id);
+      const theirExercises = exercises.filter(
+        (exercise) => workoutOwner.get(exercise.workout_id) === member.id,
+      );
+      const theirRules =
+        rulesByPlan.get(member.active_plan_id ?? "") ?? [];
+
+      const standing = standingFor(week, scoreByDate, today);
+
       return {
         id: member.id,
         name: member.display_name,
         emoji: member.emoji,
         isMe: member.id === user.id,
-        standing: standingFor(week, scoreByDate, today),
+        standing,
+        boards: {
+          overall: {
+            value: standing.points,
+            display: String(standing.points),
+            detail: "",
+            missing: false,
+          },
+          protein: proteinBoard(theirMeals, weightKg),
+          calories: calorieBoard(theirMeals, member, theirRules, weightKg, today),
+          strength: strengthBoard(theirExercises, weightKg),
+        },
       };
     })
     .sort((a, b) => b.standing.points - a.standing.points);
