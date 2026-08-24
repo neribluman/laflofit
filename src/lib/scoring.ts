@@ -83,3 +83,50 @@ export function bestStreak(perfectDates: string[]): number {
   }
   return best;
 }
+
+/** One person's week, as the leaderboard sees it. */
+export type WeekStanding = {
+  /** Each logged day contributes its own score out of 100. Max 700. */
+  points: number;
+  daysLogged: number;
+  /** Average score of the days they actually logged — quality, not consistency. */
+  average: number;
+  perfectDays: number;
+  streak: number;
+  loggedToday: boolean;
+  days: { date: string; ratio: number; logged: boolean }[];
+};
+
+/**
+ * Points rather than a percentage. A percentage of the whole week reads as a
+ * grade — one good day out of seven shows up as "11%", which looks like
+ * failure and tells you nothing. Points only ever go up: log more days, and
+ * score better ones. Days are scored as a share of that plan's own points, so
+ * plans of different sizes stay comparable.
+ */
+export function standingFor(
+  dates: string[],
+  scoreByDate: Map<string, DayScore>,
+  today: string,
+): WeekStanding {
+  const days = dates.map((date) => {
+    const score = scoreByDate.get(date);
+    return { date, ratio: score?.ratio ?? 0, logged: Boolean(score) };
+  });
+
+  const logged = days.filter((day) => day.logged);
+  const points = logged.reduce((sum, day) => sum + Math.round(day.ratio * 100), 0);
+
+  return {
+    points,
+    daysLogged: logged.length,
+    average: logged.length === 0 ? 0 : Math.round(points / logged.length),
+    perfectDays: dates.filter((date) => scoreByDate.get(date)?.perfect).length,
+    streak: currentStreak(
+      today,
+      new Map([...scoreByDate].map(([date, score]) => [date, score.perfect])),
+    ),
+    loggedToday: Boolean(scoreByDate.get(today)),
+    days,
+  };
+}

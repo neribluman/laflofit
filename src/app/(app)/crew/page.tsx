@@ -12,10 +12,11 @@ import {
   workoutsBetween,
 } from "@/lib/data";
 import { addDays, prettyDate, todayIn } from "@/lib/dates";
-import { currentStreak, scoreDay } from "@/lib/scoring";
+import { lastNDays } from "@/lib/dates";
+import { scoreDay, standingFor } from "@/lib/scoring";
 import { kgToDisplay, weightUnit } from "@/lib/units";
 import type { PlanRule } from "@/lib/types";
-import LeaderBars, { type LeaderRow } from "@/components/LeaderBars";
+import Leaderboard, { type LeaderRow } from "@/components/Leaderboard";
 import Link from "next/link";
 import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
@@ -39,7 +40,6 @@ export default async function CrewPage() {
   if (!crew) redirect("/login");
 
   const today = todayIn(user.timezone);
-  const weekAgo = addDays(today, -6);
   const monthAgo = addDays(today, -29);
 
   const roster = await crewRoster(crew.id);
@@ -80,38 +80,34 @@ export default async function CrewPage() {
   }
 
   // ---- Leaderboard: last 7 days ------------------------------------------
+  const week = lastNDays(today, 7);
+
   const rows: LeaderRow[] = roster
     .map((member) => {
-      const theirs = logs.filter((log) => log.user_id === member.id);
-      const perfectByDate = new Map<string, boolean>();
-      let sum = 0;
-
-      for (const log of theirs) {
-        const rules =
-          rulesByPlan.get(log.plan_id ?? member.active_plan_id ?? "") ?? [];
-        const score = scoreDay(rules, entriesByLog.get(log.id) ?? [], true);
-        perfectByDate.set(log.log_date, score.perfect);
-        if (log.log_date >= weekAgo) sum += score.ratio;
-      }
-
-      const sessions = workouts.filter(
-        (workout) =>
-          workout.user_id === member.id && workout.workout_date >= weekAgo,
-      ).length;
-      const streak = currentStreak(today, perfectByDate);
+      const scoreByDate = new Map(
+        logs
+          .filter((log) => log.user_id === member.id)
+          .map((log) => [
+            log.log_date,
+            scoreDay(
+              rulesByPlan.get(log.plan_id ?? member.active_plan_id ?? "") ?? [],
+              entriesByLog.get(log.id) ?? [],
+              true,
+            ),
+          ]),
+      );
 
       return {
         id: member.id,
         name: member.display_name,
         emoji: member.emoji,
-        ratio: sum / 7,
-        detail: `${sessions} workout${sessions === 1 ? "" : "s"} · ${
-          streak > 0 ? `${streak}-day streak` : "no streak"
-        }`,
         isMe: member.id === user.id,
+        standing: standingFor(week, scoreByDate, today),
       };
     })
-    .sort((a, b) => b.ratio - a.ratio);
+    .sort((a, b) => b.standing.points - a.standing.points);
+
+  const loggedTodayCount = rows.filter((row) => row.standing.loggedToday).length;
 
   // ---- Weight movement over 30 days --------------------------------------
   const movement = roster
@@ -235,14 +231,38 @@ export default async function CrewPage() {
       <InviteCode code={crew.invite_code} />
 
       <section>
-        <h2 className="label">Last 7 days</h2>
+        <h2 className="label">Today</h2>
         <div className="card p-4">
-          <LeaderBars rows={rows} />
-          <p className="mt-4 text-xs text-muted">
-            Share of plan rules met, averaged over seven days. A day never logged
-            counts as zero — that is rather the point.
+          <ul className="flex flex-wrap gap-2">
+            {rows.map((row) => (
+              <li
+                key={row.id}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                  row.standing.loggedToday
+                    ? "border-accent/50 bg-accent/10 text-text"
+                    : "border-line bg-surface-2 text-muted"
+                }`}
+              >
+                <span aria-hidden>{row.emoji}</span>
+                <span className="truncate">{row.name}</span>
+                <span aria-hidden className={row.standing.loggedToday ? "text-accent" : ""}>
+                  {row.standing.loggedToday ? "✓" : "·"}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted">
+            {loggedTodayCount} of {rows.length} logged today
+            {loggedTodayCount === rows.length && rows.length > 1
+              ? " — the whole crew."
+              : "."}
           </p>
         </div>
+      </section>
+
+      <section>
+        <h2 className="label">This week</h2>
+        <Leaderboard rows={rows} />
       </section>
 
       {movement.length > 0 && (
