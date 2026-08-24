@@ -168,22 +168,16 @@ Every URL the app generates then starts with `/laflofit` — pages, assets,
 form submissions — and the login cookie scopes itself to that path so the
 rest of `laflo.pro` never receives it. Redeploy after adding it.
 
-**2. Forward the path from the site that owns the domain.** In *that*
-project (not this one), add to its `vercel.json`:
+**2. Forward the path from the site that owns the domain.** That is the
+`jugaton` project. Its `next.config.ts` already has the rewrite; it only needs
+an environment variable in its own Vercel settings:
 
-```json
-{
-  "rewrites": [
-    {
-      "source": "/laflofit/:path*",
-      "destination": "https://YOUR-LAFLOFIT-PROJECT.vercel.app/laflofit/:path*"
-    }
-  ]
-}
+```
+LAFLOFIT_ORIGIN=https://YOUR-LAFLOFIT-PROJECT.vercel.app
 ```
 
-Replace the destination with this project's own Vercel URL. Deploy that
-project, and `laflo.pro/laflofit` will serve the app.
+Left unset, the rewrite is not added and that project behaves exactly as
+before. Deploy it, and `laflo.pro/laflofit` serves the app.
 
 Note what this costs you: every request goes through the other project first,
 and the two are now coupled — the rewrite has to keep pointing at a URL this

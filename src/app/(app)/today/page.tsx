@@ -32,6 +32,13 @@ import AddFoodForm from "./AddFoodForm";
 import AddWorkoutForm from "./AddWorkoutForm";
 import DayNote from "./DayNote";
 
+/**
+ * Reading a day calls Claude, which took ~12s in testing. Server actions run
+ * as part of the route they post to, and a platform default of 10s would cut
+ * that off — so ask for longer explicitly.
+ */
+export const maxDuration = 60;
+
 export default async function TodayPage({
   searchParams,
 }: {
