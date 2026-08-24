@@ -2,20 +2,42 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 let cached: NeonQueryFunction<false, false> | null = null;
 
+/**
+ * Connecting a Neon store in Vercel lets you pick a prefix for the variables
+ * it creates, so the connection string can arrive under any of these names.
+ * Pooled connections come first — that is the right one for serverless.
+ */
+const URL_VARS = [
+  "DATABASE_URL",
+  "STORAGE_DATABASE_URL",
+  "POSTGRES_URL",
+  "STORAGE_POSTGRES_URL",
+  "DATABASE_URL_UNPOOLED",
+  "STORAGE_POSTGRES_URL_NON_POOLING",
+  "POSTGRES_URL_NON_POOLING",
+] as const;
+
+function connectionString(): string | undefined {
+  for (const name of URL_VARS) {
+    const value = process.env[name];
+    if (value && value.startsWith("postgres")) return value;
+  }
+  return undefined;
+}
+
 function client() {
   if (!cached) {
-    // Vercel injects DATABASE_URL when you add Neon from the dashboard; the
-    // POSTGRES_URL fallback covers older integrations.
-    const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+    const url = connectionString();
     if (!url) {
       // The fix is completely different depending on where this is running,
       // and telling a deployed app to edit .env.local helps nobody.
       throw new Error(
         process.env.VERCEL
-          ? "DATABASE_URL is not set for this deployment. Add it in Vercel: " +
-            "Settings -> Environment Variables, tick Production, then redeploy " +
-            "— environment variables are baked in at build time, so an existing " +
-            "deployment will not pick up a variable added after it was built."
+          ? `No Postgres connection string found for this deployment. Looked ` +
+            `for: ${URL_VARS.join(", ")}. Add one in Vercel under Settings -> ` +
+            `Environment Variables (tick Production), then redeploy — ` +
+            `environment variables are baked in at build time, so an existing ` +
+            `deployment will not pick up a variable added after it was built.`
           : "DATABASE_URL is not set. Copy .env.example to .env.local and paste " +
             "in your Neon connection string, then run `npm run db:setup`.",
       );

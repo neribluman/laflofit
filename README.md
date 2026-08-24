@@ -128,8 +128,10 @@ npx vercel
 
 Then in the Vercel dashboard, **Settings → Environment Variables**, add:
 
-- `DATABASE_URL` — the same connection string (Vercel may add this for you when
-  you connect the Neon database to the project)
+- `DATABASE_URL` — the connection string. If you connected Neon through
+  Vercel's Storage tab it already created this for you, possibly under a
+  prefix like `STORAGE_DATABASE_URL`; the app accepts either, so there is
+  nothing to add by hand in that case.
 - `AUTH_SECRET` — copy the value `npm run db:setup` generated in `.env.local`
 - `ANTHROPIC_API_KEY` — only if you set up plain-English logging
 
