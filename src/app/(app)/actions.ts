@@ -354,3 +354,33 @@ export async function deleteMeal(id: string) {
   revalidatePath("/today");
   revalidatePath("/log");
 }
+
+export async function addMeal(formData: FormData) {
+  const user = await requireUser();
+  const description = String(formData.get("description") ?? "").trim();
+  if (!description) return;
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) ?? "").trim();
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
+  };
+  const slot = String(formData.get("slot") ?? "");
+
+  await sql`
+    insert into meals
+      (user_id, meal_date, description, slot, calories, protein_g, carbs_g, fat_g, fibre_g, estimated)
+    values (
+      ${user.id}, ${String(formData.get("meal_date"))}::date,
+      ${description.slice(0, 200)},
+      ${["breakfast", "lunch", "dinner", "snack", "drink"].includes(slot) ? slot : null},
+      ${num("calories")}, ${num("protein_g")}, ${num("carbs_g")},
+      ${num("fat_g")}, ${num("fibre_g")},
+      false
+    )
+  `;
+
+  revalidatePath("/today");
+  revalidatePath("/log");
+}

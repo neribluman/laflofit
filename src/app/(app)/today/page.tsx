@@ -28,6 +28,8 @@ import ResetDay from "./ResetDay";
 import MacroStrip from "@/components/MacroStrip";
 import MealList from "./MealList";
 import WorkoutList from "./WorkoutList";
+import AddFoodForm from "./AddFoodForm";
+import AddWorkoutForm from "./AddWorkoutForm";
 import DayNote from "./DayNote";
 
 export default async function TodayPage({
@@ -197,20 +199,44 @@ export default async function TodayPage({
         </div>
 
         <div className="space-y-6">
-          <MacroStrip
-            meals={meals}
-            calorieTarget={calorieRule?.target ?? null}
-          />
+          <section className="space-y-2.5">
+            <h2 className="label mb-0">Food</h2>
+            {meals.length > 0 ? (
+              <>
+                <MacroStrip
+                  meals={meals}
+                  calorieTarget={calorieRule?.target ?? null}
+                />
+                <MealList meals={meals} />
+              </>
+            ) : (
+              <p className="card p-4 text-sm text-muted">
+                Nothing yet. Describe what you ate in the box, or add it by
+                hand.
+              </p>
+            )}
+            <AddFoodForm date={date} />
+          </section>
 
-          <MealList meals={meals} />
-
-          <WorkoutList
-            workouts={workouts}
-            exercises={exercises}
-            units={user.units}
-            weightUnit={weightUnit(user.units)}
-            distanceUnit={distanceUnit(user.units)}
-          />
+          <section className="space-y-2.5">
+            <h2 className="label mb-0">Training</h2>
+            {workouts.length > 0 ? (
+              <WorkoutList
+                workouts={workouts}
+                exercises={exercises}
+                units={user.units}
+                weightUnit={weightUnit(user.units)}
+                distanceUnit={distanceUnit(user.units)}
+              />
+            ) : (
+              <p className="card p-4 text-sm text-muted">
+                Nothing yet. Describe the session in the box &mdash;
+                &ldquo;squats 5x5 at 100kg&rdquo; and the like &mdash; or add it
+                by hand.
+              </p>
+            )}
+            <AddWorkoutForm date={date} />
+          </section>
 
           {todayWeight?.weight_kg != null && (
             <p className="text-sm text-muted">

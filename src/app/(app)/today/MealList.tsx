@@ -12,9 +12,7 @@ export default function MealList({ meals }: { meals: Meal[] }) {
   );
 
   return (
-    <div>
-      <p className="label">What you ate</p>
-      <ul className="card divide-y divide-line">
+    <ul className="card divide-y divide-line">
         {sorted.map((meal) => (
           <li key={meal.id} className="flex items-start gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
@@ -40,8 +38,7 @@ export default function MealList({ meals }: { meals: Meal[] }) {
               </button>
             </form>
           </li>
-        ))}
-      </ul>
-    </div>
+      ))}
+    </ul>
   );
 }

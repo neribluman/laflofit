@@ -27,9 +27,7 @@ export default function WorkoutList({
   }
 
   return (
-    <div>
-      <p className="label">Training</p>
-      <ul className="space-y-2">
+    <ul className="space-y-2">
         {workouts.map((workout) => {
           const moves = byWorkout.get(workout.id) ?? [];
           return (
@@ -87,8 +85,7 @@ export default function WorkoutList({
               )}
             </li>
           );
-        })}
-      </ul>
-    </div>
+      })}
+    </ul>
   );
 }
