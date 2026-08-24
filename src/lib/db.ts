@@ -8,9 +8,16 @@ function client() {
     // POSTGRES_URL fallback covers older integrations.
     const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
     if (!url) {
+      // The fix is completely different depending on where this is running,
+      // and telling a deployed app to edit .env.local helps nobody.
       throw new Error(
-        "DATABASE_URL is not set. Copy .env.example to .env.local and paste in " +
-          "your Neon connection string, then run `npm run db:setup`.",
+        process.env.VERCEL
+          ? "DATABASE_URL is not set for this deployment. Add it in Vercel: " +
+            "Settings -> Environment Variables, tick Production, then redeploy " +
+            "— environment variables are baked in at build time, so an existing " +
+            "deployment will not pick up a variable added after it was built."
+          : "DATABASE_URL is not set. Copy .env.example to .env.local and paste " +
+            "in your Neon connection string, then run `npm run db:setup`.",
       );
     }
     cached = neon(url);

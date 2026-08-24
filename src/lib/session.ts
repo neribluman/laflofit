@@ -14,8 +14,13 @@ function secret(): string {
   const value = process.env.AUTH_SECRET;
   if (!value || value.length < 16) {
     throw new Error(
-      "AUTH_SECRET is missing or too short. Run `npm run db:setup` to generate " +
-        "one, or set it in your Vercel environment variables.",
+      process.env.VERCEL
+        ? "AUTH_SECRET is not set for this deployment. Add it in Vercel: " +
+          "Settings -> Environment Variables, tick Production, then redeploy. " +
+          "Use the value `npm run db:setup` generated in your local .env.local, " +
+          "so existing logins keep working."
+        : "AUTH_SECRET is missing or too short. Run `npm run db:setup` to " +
+          "generate one.",
     );
   }
   return value;
