@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { crewByCode, crewRoster, currentUser } from "@/lib/data";
+import Avatar from "@/components/Avatar";
 
 /**
  * Where an invite link lands. The code is in the URL, so nobody has to read
@@ -50,9 +51,7 @@ export default async function JoinPage({
               key={member.id}
               className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs"
             >
-              {/* Emoji, not the photo: this page is visible to anyone
-                  holding the link, and /avatar needs a session anyway. */}
-              <span aria-hidden>{member.emoji}</span>
+              <Avatar user={member} code={crew.invite_code} />
               {member.display_name}
             </span>
           ))}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { crewByCode, crewRoster, currentUser } from "@/lib/data";
 import PinForm from "./PinForm";
 import JoinForm from "./JoinForm";
+import Avatar from "@/components/Avatar";
 
 export default async function LoginPage({
   searchParams,
@@ -73,6 +74,8 @@ export default async function LoginPage({
             userId={picked.id}
             name={picked.display_name}
             emoji={picked.emoji}
+            hasAvatar={picked.has_avatar}
+            code={crew.invite_code}
           />
           <Link
             href={`/login?code=${crew.invite_code}`}
@@ -109,9 +112,9 @@ export default async function LoginPage({
                   <li key={member.id}>
                     <Link
                       href={`/login?code=${crew.invite_code}&who=${member.id}`}
-                      className="btn-ghost w-full justify-start"
+                      className="btn-ghost w-full justify-start gap-3"
                     >
-                      <span className="text-lg">{member.emoji}</span>
+                      <Avatar user={member} size="md" code={crew.invite_code} />
                       <span className="truncate">{member.display_name}</span>
                     </Link>
                   </li>

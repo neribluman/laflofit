@@ -10,9 +10,12 @@ const SIZES = { sm: "h-6 w-6 text-xs", md: "h-9 w-9 text-base", lg: "h-14 w-14 t
 export default function Avatar({
   user,
   size = "sm",
+  code,
 }: {
   user: Pick<User, "id" | "emoji" | "display_name"> & { has_avatar?: boolean };
   size?: keyof typeof SIZES;
+  /** Invite code, for the sign-in and invite screens where there's no session. */
+  code?: string;
 }) {
   const shared = `${SIZES[size]} shrink-0 rounded-full object-cover`;
 
@@ -23,7 +26,7 @@ export default function Avatar({
       // an image that is finished.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`/avatar/${user.id}`}
+        src={`/avatar/${user.id}${code ? `?code=${encodeURIComponent(code)}` : ""}`}
         alt=""
         width={56}
         height={56}
