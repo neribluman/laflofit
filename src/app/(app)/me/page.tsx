@@ -12,6 +12,7 @@ import {
 } from "@/lib/data";
 import { addDays, prettyDate, todayIn } from "@/lib/dates";
 import { bestStreak, currentStreak, scoreDay } from "@/lib/scoring";
+import { missingForEnergy } from "@/lib/profile";
 import { describeExercise } from "@/lib/exercise-format";
 import {
   cmToDisplay,
@@ -100,6 +101,12 @@ export default async function MePage() {
     value: kgToDisplay(m.weight_kg!, user.units),
   }));
   const recent = [...measurements].reverse().slice(0, 8);
+
+  // If the profile is short of something, don't make them find the form.
+  const latestWeightKg =
+    [...measurements].reverse().find((m) => m.weight_kg != null)?.weight_kg ?? null;
+  const profileIncomplete =
+    missingForEnergy(user, latestWeightKg, today).length > 0;
 
   return (
     <main className="mx-auto max-w-lg space-y-8 lg:max-w-2xl">
@@ -259,7 +266,7 @@ export default async function MePage() {
         )}
       </section>
 
-      <section>
+      <section id="about-you" className="scroll-mt-4">
         <h2 className="label">About you</h2>
         {user.about ? (
           <p className="card mb-2.5 p-4 text-sm">{user.about}</p>
@@ -270,7 +277,7 @@ export default async function MePage() {
             than an average person.
           </p>
         )}
-        <details className="card p-4">
+        <details className="card p-4" open={profileIncomplete}>
           <summary className="cursor-pointer text-sm font-medium text-muted">
             Edit your details
           </summary>

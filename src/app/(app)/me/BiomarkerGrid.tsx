@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cmToDisplay, kgToDisplay, lengthUnit, weightUnit } from "@/lib/units";
 import { ageFrom, energyEstimate, missingForEnergy } from "@/lib/profile";
 import type { Measurement, User } from "@/lib/types";
@@ -123,9 +124,12 @@ export default function BiomarkerGrid({
 
       {!energy && blocking.length > 0 && (
         <p className="card p-3.5 text-xs text-muted">
-          Add {blocking.join(" and ")} below and you&apos;ll get a
-          maintenance-calorie estimate, and a place on the crew&apos;s calorie
-          board.
+          Add {blocking.join(" and ")} under{" "}
+          <Link href="#about-you" className="font-semibold text-accent">
+            About you
+          </Link>{" "}
+          and you&apos;ll get a maintenance-calorie estimate, and a place on the
+          crew&apos;s calorie board.
         </p>
       )}
     </div>
