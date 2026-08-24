@@ -190,3 +190,78 @@ export async function interpretDay({
   const known = new Set(rules.map((rule) => rule.id));
   return { ...parsed, rules: parsed.rules.filter((r) => known.has(r.rule_id)) };
 }
+
+// ---------------------------------------------------------------------------
+// Building a plan from a description of what someone is after
+// ---------------------------------------------------------------------------
+
+const PlanDraft = z.object({
+  name: z.string().describe("two or three words, how they'd refer to it"),
+  description: z.string().describe("one sentence saying what this plan is for"),
+  rules: z.array(
+    z.object({
+      label: z.string().describe("the rule as they would say it, short"),
+      kind: z
+        .enum(["do", "avoid", "count"])
+        .describe(
+          "'do' for something to do, 'avoid' for something to stay off, 'count' for a number with a target",
+        ),
+      unit: z.string().nullable().describe("only for count rules: kcal, g, L, steps, min"),
+      target: z.number().nullable().describe("only for count rules"),
+      cadence: z
+        .enum(["daily", "weekly"])
+        .describe("'weekly' only for an allowance spent once a week, like a cheat day"),
+      points: z.number().describe("2 for the rules that carry the goal, 1 for the rest, 0 for an allowance"),
+    }),
+  ),
+  unclear: z.array(z.string()).describe("anything they asked for that a daily checklist cannot hold"),
+});
+
+export type PlanDraft = z.infer<typeof PlanDraft>;
+
+const PLAN_SYSTEM = `You turn someone's description of what they are trying to do into a daily checklist for a diet and training tracker.
+
+What makes a good rule here:
+- It can be answered honestly at the end of a day, in one action, without looking anything up. "No beer" works. "Eat clean" does not.
+- Between four and seven rules. This is a list someone faces every evening; a long one gets abandoned, and everything on it should be load-bearing.
+- Use 'count' with a real target wherever a number is natural — calories, protein, water, steps, minutes. Use their number if they gave one. A 'count' rule MUST have a target: if there is no number to hit, it is a 'do' or an 'avoid', not a count.
+- Use 'avoid' for the specific things they said they want to cut. Name the thing, not the category.
+- 'weekly' is for an allowance they spend once a week — a cheat day, a rest day. Give it 0 points: it is permission, not an achievement.
+- Points: 2 for the two or three rules that actually carry their goal, 1 for supporting ones.
+
+When you are told about them, size the targets to that person: a calorie target for someone cutting should sit under their maintenance, not at it, and protein should scale with their bodyweight. A target they cannot hit is worse than no target.
+
+Only build rules for what they asked for. Do not add sleep, steps or water because those are usually good ideas — if they did not mention it, leave it out. Anything they want that a daily tick cannot capture goes in unclear.`;
+
+export async function interpretPlanRequest({
+  text,
+  units,
+  person,
+}: {
+  text: string;
+  units: Units;
+  person?: string;
+}): Promise<PlanDraft> {
+  const client = new Anthropic();
+
+  const response = await client.messages.parse({
+    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
+    max_tokens: 4000,
+    system: PLAN_SYSTEM,
+    output_config: { effort: "medium", format: zodOutputFormat(PlanDraft) },
+    messages: [
+      {
+        role: "user",
+        content: [
+          person ? `About them: ${person}\n` : "",
+          `They measure weight in ${weightUnit(units)}.`,
+          `\nWhat they said they want:\n"""\n${text}\n"""`,
+        ].join("\n"),
+      },
+    ],
+  });
+
+  const parsed = response.parsed_output;
+  if (!parsed) throw new Error("Could not read that. Try rephrasing?");
+  return parsed;
+}

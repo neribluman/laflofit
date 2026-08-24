@@ -19,6 +19,21 @@ export type Preset = {
 
 export const PRESETS: Preset[] = [
   {
+    key: "calories-protein-training",
+    name: "Calories, Protein & Training",
+    emoji: "🍳",
+    blurb:
+      "The one most people want: a calorie ceiling, a protein floor, and showing up to train. Works alongside almost any way of eating.",
+    rules: [
+      { label: "Calories", kind: "count", unit: "kcal", target: 2000, points: 2 },
+      { label: "Protein", kind: "count", unit: "g", target: 150, points: 2 },
+      { label: "Trained today", kind: "do", points: 2 },
+      { label: "Steps", kind: "count", unit: "steps", target: 8000 },
+      { label: "Water", kind: "count", unit: "L", target: 2.5 },
+      { label: "Rest day", kind: "do", cadence: "weekly", points: 0 },
+    ],
+  },
+  {
     key: "slow-carb",
     name: "Slow-Carb",
     emoji: "🫘",
@@ -32,20 +47,6 @@ export const PRESETS: Preset[] = [
       { label: "Legumes + veg at every meal", kind: "do" },
       { label: "Water", kind: "count", unit: "L", target: 2.5 },
       { label: "Cheat day", kind: "do", cadence: "weekly", points: 0 },
-    ],
-  },
-  {
-    key: "calorie-protein",
-    name: "Calories & Protein",
-    emoji: "🍳",
-    blurb:
-      "The plain-vanilla one that works for almost any diet: hit a calorie ceiling and a protein floor, every day.",
-    rules: [
-      { label: "Calories", kind: "count", unit: "kcal", target: 2000, points: 2 },
-      { label: "Protein", kind: "count", unit: "g", target: 150, points: 2 },
-      { label: "No snacking after 20:00", kind: "avoid" },
-      { label: "Water", kind: "count", unit: "L", target: 2.5 },
-      { label: "Steps", kind: "count", unit: "steps", target: 8000 },
     ],
   },
   {
@@ -75,13 +76,6 @@ export const PRESETS: Preset[] = [
       { label: "7+ hours sleep", kind: "do" },
       { label: "Rest day", kind: "do", cadence: "weekly", points: 0 },
     ],
-  },
-  {
-    key: "blank",
-    name: "Start from scratch",
-    emoji: "✏️",
-    blurb: "An empty plan. Write your own rules — it is your diet, after all.",
-    rules: [],
   },
 ];
 

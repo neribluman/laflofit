@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { crewById, currentUser, plansForCrew } from "@/lib/data";
 import { todayIn } from "@/lib/dates";
+import { canInterpret } from "@/lib/interpret";
 import { lengthUnit, weightUnit } from "@/lib/units";
 import PlanStep from "./PlanStep";
 import IntakeSurvey from "./IntakeSurvey";
@@ -73,12 +74,16 @@ export default async function Onboarding({
         </>
       ) : (
         <>
-          <h1 className="text-2xl font-bold tracking-tight">Choose the rules</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Choose your plan</h1>
           <p className="mt-1.5 mb-6 text-sm text-muted">
-            A plan is just a checklist you face every evening. Pick a starting
-            point — you can rewrite every rule afterwards.
+            A plan is a short checklist you face every evening. Pick one to
+            start from — every rule stays editable afterwards.
           </p>
-          <PlanStep crewName={crew.name} existingPlans={plans} />
+          <PlanStep
+            crewName={crew.name}
+            existingPlans={plans}
+            canDraft={canInterpret()}
+          />
         </>
       )}
     </main>

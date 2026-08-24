@@ -157,7 +157,7 @@ export default async function PlanPage() {
       <section>
         <h2 className="label">Start a different plan</h2>
         <div className="space-y-2">
-          {PRESETS.filter((p) => p.key !== "blank").map((preset) => (
+          {PRESETS.map((preset) => (
             <form key={preset.key} action={startPreset}>
               <input type="hidden" name="preset" value={preset.key} />
               <input type="hidden" name="scope" value="me" />

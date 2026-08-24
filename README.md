@@ -21,6 +21,7 @@ rules, so it works for any diet.
 | **Just tell me about your day** | One text box on Today, for the whole day. Write what you ate, what you lifted and how it went in plain English. It logs **every food and drink with estimated calories, protein, carbs, fat and fibre**, reads gym shorthand into **exercises with sets, reps and load**, ticks your plan's rules, and records a weigh-in. Shows you what it understood, and only writes once you confirm. |
 | **Macros** | Day totals sit alongside the checklist, with every food and every exercise listed and individually deletable. If your plan has a calorie or protein rule, it fills itself in from the food you logged rather than asking twice. |
 | **Undo** | "Reset today" at the bottom of Today wipes that date back to never-logged. It lists exactly what will go — ticks, note, workouts, weigh-in — before it deletes anything. Individual workouts and weigh-ins can also be deleted one at a time from Log. |
+| **Write your own plan** | Describe what you're after — *"drop 8kg by summer without losing strength, beer is my problem, I lift three times a week"* — and it builds the checklist: a calorie ceiling under your maintenance, a protein floor scaled to your weight, the specific thing you said you'd cut, and a weekly night off. Sized to you, because it reads your profile. Shown before anything is saved. |
 | **Plan** | Add, edit and delete rules. Three kinds: *do it*, *avoid it*, *count it* (with a target). Rules can be daily or a once-a-week allowance, which is how the slow-carb cheat day works. |
 
 ---
