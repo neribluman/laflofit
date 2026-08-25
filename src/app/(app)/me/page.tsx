@@ -31,6 +31,9 @@ import AvatarPicker from "@/components/AvatarPicker";
 import BiomarkerForm from "./BiomarkerForm";
 import ProfileFields from "@/components/ProfileFields";
 import BiomarkerGrid from "./BiomarkerGrid";
+import PlanReviewCard from "./PlanReviewCard";
+import { cachedReview } from "./review-actions";
+import { canInterpret } from "@/lib/interpret";
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -304,6 +307,13 @@ export default async function MePage() {
           <span className="text-muted">→</span>
         </Link>
       </section>
+
+      {canInterpret() && planned && (
+        <section>
+          <h2 className="label">How does this plan look?</h2>
+          <PlanReviewCard initial={await cachedReview()} />
+        </section>
+      )}
 
       <section>
         <h2 className="label">Photo</h2>

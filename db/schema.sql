@@ -258,3 +258,14 @@ create table if not exists crew_banter (
   created_at timestamptz not null default now(),
   unique (crew_id, for_date)
 );
+
+-- Claude's read on one person's plan, kept so the button doesn't re-bill for
+-- a picture that hasn't changed. One row per person: `digest` fingerprints the
+-- profile, rules and logs it was written from, so editing a target or logging
+-- a few days makes it stale and the next press writes a fresh one.
+create table if not exists plan_reviews (
+  user_id    uuid primary key references users (id) on delete cascade,
+  digest     text not null,
+  body       jsonb not null,
+  created_at timestamptz not null default now()
+);
