@@ -60,3 +60,40 @@ export function startOfWeek(isoDate: string): string {
   dt.setUTCDate(dt.getUTCDate() - shift);
   return dt.toISOString().slice(0, 10);
 }
+
+/** First day of the month containing isoDate. */
+export function startOfMonth(isoDate: string): string {
+  return `${isoDate.slice(0, 7)}-01`;
+}
+
+/** Every date in that month, in order. */
+export function monthDays(isoMonth: string): string[] {
+  const [y, m] = isoMonth.split("-").map(Number);
+  const count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return Array.from(
+    { length: count },
+    (_, i) => `${isoMonth}-${String(i + 1).padStart(2, "0")}`,
+  );
+}
+
+/** Monday = 0 … Sunday = 6, matching how the grid is laid out. */
+export function weekdayIndex(isoDate: string): number {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+}
+
+export function monthLabel(isoMonth: string): string {
+  const [y, m] = isoMonth.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+/** Shift a YYYY-MM by n months. */
+export function addMonths(isoMonth: string, n: number): string {
+  const [y, m] = isoMonth.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1 + n, 1));
+  return dt.toISOString().slice(0, 7);
+}

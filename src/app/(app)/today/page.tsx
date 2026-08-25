@@ -12,7 +12,8 @@ import {
 } from "@/lib/data";
 import {
   addDays,
-  lastNDays,
+  addMonths,
+  monthDays,
   prettyDate,
   startOfWeek,
   todayIn,
@@ -21,7 +22,7 @@ import { currentStreak, scoreDay } from "@/lib/scoring";
 import { canInterpret } from "@/lib/interpret";
 import { distanceUnit, fmtWeight, weightUnit } from "@/lib/units";
 import ScoreRing from "@/components/ScoreRing";
-import WeekStrip, { type StripDay } from "@/components/WeekStrip";
+import MonthGrid, { type MonthDay, type MonthTotals } from "@/components/MonthGrid";
 import CheckInList from "./CheckInList";
 import NaturalLog from "./NaturalLog";
 import ResetDay from "./ResetDay";
@@ -43,13 +44,13 @@ export const maxDuration = 60;
 export default async function TodayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ d?: string; show?: string }>;
+  searchParams: Promise<{ d?: string; show?: string; m?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login");
 
   const today = todayIn(user.timezone);
-  const { d, show } = await searchParams;
+  const { d, show, m } = await searchParams;
   const date = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : today;
 
   const planned = user.active_plan_id
@@ -58,8 +59,12 @@ export default async function TodayPage({
   if (!planned) redirect("/onboarding");
   const { plan, rules } = planned;
 
-  // 60 days is enough history for the streak and the week strip in one query.
-  const windowStart = addDays(today, -59);
+  // The month being viewed, and a window wide enough for it plus the streak.
+  const month =
+    m && /^\d{4}-\d{2}$/.test(m) && `${m}-01` <= today ? m : date.slice(0, 7);
+  const monthStart = `${month}-01`;
+  const windowStart =
+    monthStart < addDays(today, -59) ? monthStart : addDays(today, -59);
   const logs = await dayLogsBetween([user.id], windowStart, today);
   const entries = await entriesForLogs(logs.map((l) => l.id));
 
@@ -101,15 +106,42 @@ export default async function TodayPage({
     new Map([...scoreByDate].map(([k, v]) => [k, v.perfect])),
   );
 
-  const strip: StripDay[] = lastNDays(date, 7).map((day) => {
-    const s = scoreByDate.get(day);
+  const monthGrid: MonthDay[] = monthDays(month).map((day) => {
+    const score = scoreByDate.get(day);
     return {
       date: day,
-      ratio: s?.ratio ?? 0,
-      perfect: s?.perfect ?? false,
-      logged: Boolean(s),
+      ratio: score?.ratio ?? 0,
+      perfect: score?.perfect ?? false,
+      logged: Boolean(score),
     };
   });
+
+  const loggedDays = monthGrid.filter((day) => day.logged);
+  const monthMeals = await mealsBetween(
+    [user.id],
+    monthStart,
+    monthDays(month).at(-1)!,
+  );
+
+  // Averages count only the days that have the thing being averaged — a month
+  // with two weigh-ins should not report an average calorie intake of zero.
+  const daysWithFood = new Map<string, { kcal: number; protein: number }>();
+  for (const meal of monthMeals) {
+    const running = daysWithFood.get(meal.meal_date) ?? { kcal: 0, protein: 0 };
+    running.kcal += meal.calories ?? 0;
+    running.protein += meal.protein_g ?? 0;
+    daysWithFood.set(meal.meal_date, running);
+  }
+  const foodDays = [...daysWithFood.values()];
+  const mean = (nums: number[]) =>
+    nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null;
+
+  const monthTotals: MonthTotals = {
+    daysLogged: loggedDays.length,
+    averageScore: mean(loggedDays.map((day) => day.ratio * 100)) ?? 0,
+    averageCalories: mean(foodDays.map((f) => f.kcal)),
+    averageProtein: mean(foodDays.map((f) => f.protein)),
+  };
 
   // Weekly allowances (the slow-carb cheat day) reset every Monday.
   const weekStart = startOfWeek(date);
@@ -149,7 +181,9 @@ export default async function TodayPage({
     <main className="space-y-6">
       <header className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
+          {/* The page is the log; the date says which day of it you're on. */}
+          <h1 className="text-2xl font-bold tracking-tight">Log</h1>
+          <div className="mt-0.5 flex items-center gap-1">
             <Link
               href={`/today?d=${prev}`}
               aria-label="Previous day"
@@ -157,13 +191,7 @@ export default async function TodayPage({
             >
               ‹
             </Link>
-            <h1 className="min-w-0">
-              <DateJump
-                date={date}
-                today={today}
-                label={prettyDate(date, today)}
-              />
-            </h1>
+            <DateJump date={date} today={today} label={prettyDate(date, today)} />
             {next <= today && (
               <Link
                 href={`/today?d=${next}`}
@@ -190,7 +218,19 @@ export default async function TodayPage({
       </header>
 
       <div className="lg:max-w-xl">
-        <WeekStrip days={strip} selected={date} />
+        <MonthGrid
+          month={month}
+          days={monthGrid}
+          totals={monthTotals}
+          selected={date}
+          today={today}
+          prevHref={`/today?d=${date}&m=${addMonths(month, -1)}`}
+          nextHref={
+            `${addMonths(month, 1)}-01` <= today
+              ? `/today?d=${date}&m=${addMonths(month, 1)}`
+              : null
+          }
+        />
       </div>
 
       <div

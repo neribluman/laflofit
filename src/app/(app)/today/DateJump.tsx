@@ -20,7 +20,7 @@ export default function DateJump({
 
   return (
     <span className="relative inline-flex items-center">
-      <span className="truncate text-2xl font-bold tracking-tight">{label}</span>
+      <span className="truncate text-base font-semibold">{label}</span>
       <svg
         viewBox="0 0 24 24"
         className="ml-1 h-4 w-4 shrink-0 text-muted"
