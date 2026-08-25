@@ -25,6 +25,7 @@ import WeekStrip, { type StripDay } from "@/components/WeekStrip";
 import CheckInList from "./CheckInList";
 import NaturalLog from "./NaturalLog";
 import ResetDay from "./ResetDay";
+import DateJump from "./DateJump";
 import MacroStrip from "@/components/MacroStrip";
 import MealList from "./MealList";
 import WorkoutList from "./WorkoutList";
@@ -156,8 +157,12 @@ export default async function TodayPage({
             >
               ‹
             </Link>
-            <h1 className="truncate text-2xl font-bold tracking-tight">
-              {prettyDate(date, today)}
+            <h1 className="min-w-0">
+              <DateJump
+                date={date}
+                today={today}
+                label={prettyDate(date, today)}
+              />
             </h1>
             {next <= today && (
               <Link
