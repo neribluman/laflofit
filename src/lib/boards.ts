@@ -1,4 +1,4 @@
-import type { Exercise, Meal, PlanRule, User } from "./types";
+import type { Exercise, Meal, PlanRule, User, Workout } from "./types";
 import { energyEstimate, ageFrom, missingForEnergy } from "./profile";
 
 /**
@@ -23,7 +23,12 @@ export const liftFor = (name: string) =>
 export const estimatedOneRep = (weightKg: number, reps: number | null) =>
   weightKg * (1 + Math.max(1, reps ?? 1) / 30);
 
-export type BoardKey = "overall" | "protein" | "calories" | "strength";
+export type BoardKey =
+  | "overall"
+  | "training"
+  | "protein"
+  | "calories"
+  | "strength";
 
 export type BoardEntry = {
   /** What ranks them. Higher is always better, whatever the board. */
@@ -143,7 +148,9 @@ export function strengthBoard(
     const oneRep = estimatedOneRep(exercise.weight_kg, exercise.reps);
     if (oneRep > (best.get(lift.key) ?? 0)) best.set(lift.key, oneRep);
   }
-  if (best.size === 0) return { ...NOTHING, detail: "no barbell lifts logged" };
+  if (best.size === 0) {
+    return { ...NOTHING, detail: "no squat, bench, deadlift or press logged" };
+  }
 
   const total = [...best.values()].reduce((a, b) => a + b, 0);
   const ratio = total / weightKg;
@@ -156,6 +163,47 @@ export function strengthBoard(
     value: ratio,
     display: `${ratio.toFixed(2)}×`,
     detail,
+    missing: false,
+  };
+}
+
+/**
+ * Days trained this week. Deliberately not minutes: free text gives a duration
+ * for a yoga class and almost never for a lifting session, so a time-based
+ * board quietly ranks the lifters last. Showing up is the thing every sport in
+ * this crew has in common, so that is what it counts.
+ *
+ * Nobody is ever "missing" here — a zero is the honest answer and the whole
+ * point of a board your friends can see.
+ */
+export function trainingBoard(workouts: Workout[], week: string[]): BoardEntry {
+  const days = new Set<string>();
+  const kinds = new Map<string, number>();
+  let minutes = 0;
+
+  for (const workout of workouts) {
+    if (!week.includes(workout.workout_date)) continue;
+    days.add(workout.workout_date);
+    kinds.set(workout.kind, (kinds.get(workout.kind) ?? 0) + 1);
+    minutes += workout.minutes ?? 0;
+  }
+
+  const sessions = [...kinds.values()].reduce((a, b) => a + b, 0);
+  if (sessions === 0) {
+    return { value: 0, display: "—", detail: "no training logged", missing: false };
+  }
+
+  // Same number of days is a real tie; two sessions on one of them is not
+  // quite. Small enough never to overtake a whole extra day.
+  const value = days.size + Math.min(sessions, 20) * 0.001;
+
+  return {
+    value,
+    display: `${days.size} day${days.size === 1 ? "" : "s"}`,
+    detail:
+      [...kinds]
+        .map(([kind, n]) => (n > 1 ? `${kind} ×${n}` : kind))
+        .join(" · ") + (minutes > 0 ? ` · ${minutes} min` : ""),
     missing: false,
   };
 }

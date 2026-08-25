@@ -23,6 +23,7 @@ import {
   calorieBoard,
   proteinBoard,
   strengthBoard,
+  trainingBoard,
 } from "@/lib/boards";
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
@@ -119,6 +120,9 @@ export default async function CrewPage() {
       const theirExercises = exercises.filter(
         (exercise) => workoutOwner.get(exercise.workout_id) === member.id,
       );
+      const theirWorkouts = workouts.filter(
+        (workout) => workout.user_id === member.id,
+      );
       const theirRules =
         rulesByPlan.get(member.active_plan_id ?? "") ?? [];
 
@@ -138,6 +142,7 @@ export default async function CrewPage() {
             detail: "",
             missing: false,
           },
+          training: trainingBoard(theirWorkouts, week),
           protein: proteinBoard(theirMeals, weightKg),
           calories: calorieBoard(theirMeals, member, theirRules, weightKg, today),
           strength: strengthBoard(theirExercises, weightKg),

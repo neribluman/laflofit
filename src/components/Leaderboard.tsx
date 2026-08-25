@@ -18,11 +18,22 @@ export type LeaderRow = {
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+/** "Gidi, DADDY and Amir" — a list people would actually say out loud. */
+const listOf = (names: string[]) =>
+  names.length <= 1
+    ? (names[0] ?? "")
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
 const BOARDS: { key: BoardKey; tab: string; note: string }[] = [
   {
     key: "overall",
     tab: "Overall",
     note: "Each logged day is worth up to 100 — how much you get is how much of your plan you hit.",
+  },
+  {
+    key: "training",
+    tab: "Training",
+    note: "Days you trained this week — a class, a walk and a lifting day each count once. Minutes aren't the measure: free text rarely says how long a gym session took, and counting them would put the lifters last.",
   },
   {
     key: "protein",
@@ -55,7 +66,16 @@ export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
   });
 
   const scored = ranked.filter((row) => !row.boards[board].missing);
+  const absent = ranked.filter((row) => row.boards[board].missing);
   const best = Math.max(...scored.map((row) => row.boards[board].value), 0.0001);
+
+  // Everyone left out for the same reason gets one line between them.
+  const sidelined = [...
+    absent.reduce((groups, row) => {
+      const why = row.boards[board].detail;
+      return groups.set(why, [...(groups.get(why) ?? []), row.name]);
+    }, new Map<string, string[]>()),
+  ];
 
   const me = rows.find((row) => row.isMe);
   const leader = scored[0];
@@ -66,13 +86,13 @@ export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
 
   return (
     <div className="card p-4">
-      <div className="mb-4 grid grid-cols-4 gap-1 rounded-xl bg-surface-2 p-1">
+      <div className="mb-4 grid grid-cols-5 gap-1 rounded-xl bg-surface-2 p-1">
         {BOARDS.map((option) => (
           <button
             key={option.key}
             onClick={() => setBoard(option.key)}
             aria-pressed={board === option.key}
-            className={`rounded-lg py-1.5 text-xs font-semibold transition ${
+            className={`rounded-lg py-1.5 text-[11px] font-semibold transition ${
               board === option.key ? "bg-accent text-accent-ink" : "text-muted"
             }`}
           >
@@ -82,7 +102,7 @@ export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
       </div>
 
       <ol className="space-y-3">
-        {ranked.map((row, i) => {
+        {scored.map((row, i) => {
           const entry = row.boards[board];
           const expandable = board === "overall";
           const expanded = open === row.id && expandable;
@@ -186,6 +206,22 @@ export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
           );
         })}
       </ol>
+
+      {scored.length === 0 && (
+        <p className="py-2 text-sm text-muted">
+          Nobody has logged enough for this one yet.
+        </p>
+      )}
+
+      {sidelined.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-line pt-3">
+          {sidelined.map(([why, names]) => (
+            <li key={why} className="text-xs text-muted">
+              <span className="text-text">{listOf(names)}</span> — {why}.
+            </li>
+          ))}
+        </ul>
+      )}
 
       <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
         {gap > 0 && (
