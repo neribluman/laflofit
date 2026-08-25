@@ -47,7 +47,7 @@ const BOARDS: { key: BoardKey; tab: string; note: string }[] = [
   {
     key: "calories",
     tab: "Calories",
-    note: "How close you stayed to your own calorie target — eating under counts against you exactly as much as eating over. 100 is dead on.",
+    note: "How close you stayed to the target that gets you to your goal weight — maintenance less a deficit if you want to lose, maintenance if you're holding. Eating under counts against you as much as eating over. Tap a row to see where that number came from.",
   },
   {
     key: "strength",
@@ -66,6 +66,7 @@ export default function Leaderboard({
   const [board, setBoard] = useState<BoardKey>("overall");
   const [open, setOpen] = useState<string | null>(null);
   const [roast, setRoast] = useState<Roast | null>(null);
+  const [explaining, setExplaining] = useState<string | null>(null);
 
   // Fetched after paint. The numbers are the page; the ribbing arrives a beat
   // later, which is roughly how it works in person too.
@@ -123,7 +124,10 @@ export default function Leaderboard({
         {BOARDS.map((option) => (
           <button
             key={option.key}
-            onClick={() => setBoard(option.key)}
+            onClick={() => {
+              setBoard(option.key);
+              setExplaining(null);
+            }}
             aria-pressed={board === option.key}
             className={`rounded-lg py-1.5 text-[11px] font-semibold transition ${
               board === option.key ? "bg-accent text-accent-ink" : "text-muted"
@@ -235,6 +239,24 @@ export default function Leaderboard({
                   </p>
                 )}
               </button>
+
+              {entry.explain && (
+                <div className="ml-7">
+                  <button
+                    onClick={() => setExplaining(explaining === row.id ? null : row.id)}
+                    aria-expanded={explaining === row.id}
+                    title={entry.explain}
+                    className="text-xs text-muted underline decoration-dotted underline-offset-2"
+                  >
+                    {explaining === row.id ? "Hide" : "Where's that from?"}
+                  </button>
+                  {explaining === row.id && (
+                    <p className="mt-1 rounded-lg bg-surface-2 px-2.5 py-2 text-xs leading-relaxed text-muted">
+                      {entry.explain}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {expanded && (
                 <ol className="mt-2 ml-7 flex gap-1.5">

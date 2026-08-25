@@ -1,5 +1,6 @@
 import type { Exercise, Meal, PlanRule, User, Workout } from "./types";
-import { energyEstimate, ageFrom, missingForEnergy } from "./profile";
+import { energyEstimate, ageFrom, missingForEnergy, calorieTarget } from "./profile";
+import { kgToDisplay, weightUnit } from "./units";
 
 /**
  * The big barbell lifts, matched loosely because the names come out of free
@@ -38,6 +39,8 @@ export type BoardEntry = {
   detail: string;
   /** True when they simply have not logged enough for this board to mean anything. */
   missing: boolean;
+  /** Where the number came from, in plain English. Shown on tap. */
+  explain?: string;
 };
 
 const NOTHING: BoardEntry = {
@@ -98,7 +101,24 @@ export function calorieBoard(
     activity: user.activity_level,
   });
 
-  const target = explicit ?? estimate?.maintenance ?? null;
+  const fmt = (kg: number) =>
+    `${kgToDisplay(kg, user.units).toFixed(1)} ${weightUnit(user.units)}`;
+
+  const aim = estimate
+    ? calorieTarget({
+        energy: estimate,
+        weightKg,
+        goalWeightKg: user.goal_weight_kg,
+        fmt,
+      })
+    : null;
+
+  // A number they set themselves beats one we worked out for them.
+  const target = explicit ?? aim?.target ?? null;
+  const explain = explicit
+    ? `${explicit.toLocaleString()} kcal is the target set in your own plan, so that is what this scores against. Change it on the Plan tab.`
+    : aim?.explain;
+
   if (!target) {
     const missing = missingForEnergy(user, weightKg, today);
     return {
@@ -124,8 +144,11 @@ export function calorieBoard(
   return {
     value: score,
     display: `${score}`,
-    detail: `${Math.round(perDay).toLocaleString()} of ${Math.round(target).toLocaleString()} kcal a day`,
+    detail: `${Math.round(perDay).toLocaleString()} of ${Math.round(target).toLocaleString()} kcal a day${
+      aim && !explicit && aim.basis === "loss" ? " to goal" : ""
+    }`,
     missing: false,
+    explain: `${explain} 100 is dead on it — over and under cost the same.`,
   };
 }
 

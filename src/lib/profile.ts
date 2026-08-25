@@ -73,6 +73,90 @@ export function energyEstimate({
   };
 }
 
+export type CalorieTarget = {
+  target: number;
+  basis: "loss" | "gain" | "hold";
+  /** How far off maintenance, positive either way. */
+  offset: number;
+  maintenance: number;
+  /** Plain English, for the tooltip. */
+  explain: string;
+};
+
+/**
+ * What to actually aim at, given where they want to end up.
+ *
+ * Maintenance is the amount that keeps you exactly where you are, so scoring
+ * someone against it rewards them for not reaching their goal. This aims at
+ * the goal instead.
+ *
+ * The deficit is the smaller of 500 kcal — the usual figure for roughly half
+ * a kilo a week — and a fifth of maintenance, so a small person is not handed
+ * the same absolute cut as a large one. It never goes below BMR: that is the
+ * energy the body spends before doing anything at all, and no leaderboard
+ * should be pushing anyone under it.
+ */
+export function calorieTarget({
+  energy,
+  weightKg,
+  goalWeightKg,
+  fmt,
+}: {
+  energy: { bmr: number; maintenance: number };
+  weightKg: number | null;
+  goalWeightKg: number | null;
+  /** Formats a weight for the explanation, in their own units. */
+  fmt: (kg: number) => string;
+}): CalorieTarget {
+  const { bmr, maintenance } = energy;
+  const gap = weightKg != null && goalWeightKg != null ? goalWeightKg - weightKg : 0;
+
+  // Within a kilo of the goal there is nothing left to chase.
+  const atGoal = Boolean(weightKg && goalWeightKg && Math.abs(gap) < 1);
+  if (!weightKg || !goalWeightKg || atGoal) {
+    return {
+      target: maintenance,
+      basis: "hold",
+      offset: 0,
+      maintenance,
+      explain: `${maintenance.toLocaleString()} kcal is roughly what holds your weight where it is, worked out from your height, age, sex and how active you say you are. ${
+        atGoal
+          ? "You're at your goal weight, so holding is the target."
+          : "No goal weight set, so that is what you're scored against — set one on the Me tab and this aims at it instead."
+      }`,
+    };
+  }
+
+  if (gap < 0) {
+    const cut = Math.min(500, Math.round(maintenance * 0.2));
+    const target = Math.max(bmr, maintenance - cut);
+    const actualCut = maintenance - target;
+    // Roughly 7,700 kcal to a kilo of fat, so state the rate the cut actually
+    // buys rather than quoting the textbook half-kilo whatever the number is.
+    const perWeek = (actualCut * 7) / 7700;
+    return {
+      target,
+      basis: "loss",
+      offset: actualCut,
+      maintenance,
+      explain: `You want to reach ${fmt(goalWeightKg)}, so the target is ${maintenance.toLocaleString()} — what holds your weight — less ${actualCut.toLocaleString()} to lose it, around ${fmt(perWeek)} a week.${
+        target === bmr
+          ? " Held at your resting burn: nothing here will ask you to eat below that."
+          : ""
+      } Eating over misses; so does eating far under.`,
+    };
+  }
+
+  const add = Math.min(300, Math.round(maintenance * 0.15));
+  return {
+    target: maintenance + add,
+    basis: "gain",
+    offset: add,
+    maintenance,
+    explain: `You want to reach ${fmt(goalWeightKg)}, so the target is ${maintenance.toLocaleString()} — what holds your weight — plus ${add.toLocaleString()} to gain it.`,
+  };
+}
+
 /**
  * One line of context for the model, built from whatever is known. Everything
  * is optional, so this shrinks gracefully rather than emitting "null".
