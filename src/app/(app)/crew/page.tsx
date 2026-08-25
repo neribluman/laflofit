@@ -160,7 +160,11 @@ export default async function CrewPage({
             // it is worth nothing. Shown that way because that sentence is the
             // whole model, and 339-out-of-an-invisible-700 was not.
             value: standing.points,
-            display: `${(standing.points / 100).toFixed(1)}/7`,
+            // Under a full day, one decimal rounds 0.25 to 0.3 and stops
+            // matching the "1 day · 25% of plan" underneath it.
+            display: `${(standing.points / 100).toFixed(
+              standing.points < 100 ? 2 : 1,
+            )}/7`,
             detail: "",
             missing: false,
           },
@@ -199,8 +203,15 @@ export default async function CrewPage({
     // Logged first, best first. Everyone who sat the day out falls to the end.
     .sort((a, b) => (b.percent ?? -1) - (a.percent ?? -1));
 
-  // Logging a day and scoring nothing on it is not a win, even unopposed.
-  const winner = dayRows[0]?.percent ? dayRows[0] : null;
+  // Whoever comes first among the people who logged. Turning up on a day
+  // nobody else did is the win — the score is a separate argument.
+  const winner = dayRows[0]?.percent != null ? dayRows[0] : null;
+
+  // Identical days share a place. Two people on nothing are not 5th and 6th.
+  const dayRanks = dayRows.map((row, i, all) => {
+    const first = all.findIndex((other) => other.percent === row.percent);
+    return first + 1;
+  });
   const dayLoggedCount = dayRows.filter((row) => row.percent != null).length;
 
   const stripDays: StripDay[] = lastNDays(today, 35).map((date) => {
@@ -425,10 +436,10 @@ export default async function CrewPage({
                       <span className="w-5 shrink-0 text-center">
                         {out ? (
                           <span className="text-xs text-muted">·</span>
-                        ) : i === 0 && winner ? (
+                        ) : dayRanks[i] === 1 ? (
                           "🥇"
                         ) : (
-                          <span className="nums text-xs text-muted">{i + 1}</span>
+                          <span className="nums text-xs text-muted">{dayRanks[i]}</span>
                         )}
                       </span>
                       <Avatar user={row.member} />

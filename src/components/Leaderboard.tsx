@@ -92,6 +92,13 @@ export default function Leaderboard({
   });
 
   const scored = ranked.filter((row) => !row.boards[board].missing);
+
+  // Competition ranking — equal scores take the same place, and the next
+  // distinct score picks up after them. 1, 2, 2, 4.
+  const ranks = scored.map(
+    (row) =>
+      scored.findIndex((other) => other.boards[board].value === row.boards[board].value) + 1,
+  );
   const absent = ranked.filter((row) => row.boards[board].missing);
   const best = Math.max(...scored.map((row) => row.boards[board].value), 0.0001);
 
@@ -151,10 +158,10 @@ export default function Leaderboard({
                   <span className="w-5 shrink-0 text-center">
                     {entry.missing ? (
                       <span className="text-xs text-muted">·</span>
-                    ) : i < 3 ? (
-                      MEDALS[i]
+                    ) : ranks[i] <= 3 ? (
+                      MEDALS[ranks[i] - 1]
                     ) : (
-                      <span className="nums text-xs text-muted">{i + 1}</span>
+                      <span className="nums text-xs text-muted">{ranks[i]}</span>
                     )}
                   </span>
                   <Avatar
