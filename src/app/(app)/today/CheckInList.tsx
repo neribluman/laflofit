@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { setRuleChecked, setRuleValue } from "../actions";
 import { isCeiling, ruleSatisfied } from "@/lib/scoring";
 import type { PlanRule, RuleEntry } from "@/lib/types";
@@ -99,6 +99,31 @@ function RuleRow({
 }) {
   const met = ruleSatisfied(rule, entry);
 
+  // Counts used to save only on blur, so typing a number and walking away
+  // lost it — and nothing on screen said either way. They now save
+  // themselves shortly after you stop typing, and say so.
+  const [typed, setTyped] = useState(String(entry?.value ?? ""));
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  const commit = (raw: string, immediate = false) => {
+    setTyped(raw);
+    setSaved(false);
+    if (timer.current) clearTimeout(timer.current);
+
+    const send = () => {
+      const trimmed = raw.trim();
+      onValue(trimmed === "" ? null : Number(trimmed));
+      setSaved(true);
+      timer.current = setTimeout(() => setSaved(false), 1600);
+    };
+
+    if (immediate) send();
+    else timer.current = setTimeout(send, 700);
+  };
+
   if (rule.kind === "count") {
     return (
       <li
@@ -113,19 +138,30 @@ function RuleRow({
             {rule.unit ? ` ${rule.unit}` : ""}
           </p>
         </div>
-        <input
-          type="number"
-          inputMode="decimal"
-          step="any"
-          defaultValue={entry?.value ?? ""}
-          onBlur={(e) => {
-            const raw = e.target.value.trim();
-            onValue(raw === "" ? null : Number(raw));
-          }}
-          aria-label={rule.label}
-          className={`field w-24 text-center nums ${met ? "border-accent" : ""}`}
-          placeholder="—"
-        />
+        <div className="flex items-center gap-2">
+          <span
+            aria-live="polite"
+            className={`text-xs transition-opacity ${
+              saved ? "text-accent opacity-100" : "opacity-0"
+            }`}
+          >
+            Saved
+          </span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={typed}
+            onChange={(e) => commit(e.target.value)}
+            onBlur={(e) => commit(e.target.value, true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            aria-label={rule.label}
+            className={`field w-24 text-center nums ${met ? "border-accent" : ""}`}
+            placeholder="—"
+          />
+        </div>
       </li>
     );
   }
