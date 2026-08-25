@@ -42,6 +42,7 @@ export default function DayStrip({
         {window.map((date) => {
           const day = byDate.get(date);
           const isSelected = date === selected;
+          const isToday = date === today;
           const future = date > today;
 
           return (
@@ -57,7 +58,11 @@ export default function DayStrip({
                   future ? "pointer-events-none opacity-30" : "hover:bg-surface-2"
                 } ${isSelected ? "bg-surface-2 ring-1 ring-accent" : ""}`}
               >
-                <span className="text-[10px] font-medium text-muted">
+                <span
+                  className={`text-[10px] font-medium ${
+                    isToday ? "text-accent" : "text-muted"
+                  }`}
+                >
                   {weekdayLetter(date)}
                 </span>
                 <span
@@ -77,6 +82,12 @@ export default function DayStrip({
                 >
                   {day?.perfect ? "✓" : day?.logged ? Math.round(day.ratio * 100) : Number(date.slice(-2))}
                 </span>
+                {/* A dot only under today, so the day you're on and the day it
+                    actually is are never the same signal. */}
+                <span
+                  aria-hidden
+                  className={`h-1 w-1 rounded-full ${isToday ? "bg-accent" : "bg-transparent"}`}
+                />
               </Link>
             </li>
           );

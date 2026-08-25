@@ -267,8 +267,6 @@ export default async function CrewPage() {
         </Link>
       )}
 
-      <InviteCode code={crew.invite_code} crewName={crew.name} />
-
       <section>
         <h2 className="label">Today</h2>
         <div className="card p-4">
@@ -399,6 +397,10 @@ export default async function CrewPage() {
           </ul>
         )}
       </section>
+
+      {/* Last: inviting someone is a once-in-a-while errand, and it was
+          sitting above the things people open this tab for. */}
+      <InviteCode code={crew.invite_code} crewName={crew.name} />
     </main>
   );
 }

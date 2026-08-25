@@ -201,6 +201,14 @@ export default async function TodayPage({
                 ›
               </Link>
             )}
+            {date !== today && (
+              <Link
+                href="/today"
+                className="chip ml-1 border-accent/50 text-accent hover:bg-accent/10"
+              >
+                Today
+              </Link>
+            )}
           </div>
           <p className="mt-1 truncate text-sm text-muted">{plan.name}</p>
           {streak > 0 && (
