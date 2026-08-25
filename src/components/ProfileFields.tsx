@@ -1,7 +1,7 @@
 import { saveProfileFields } from "@/app/(app)/profile-actions";
 import SubmitButton from "@/components/SubmitButton";
 import { ACTIVITY_LEVELS, ageFrom } from "@/lib/profile";
-import { cmToDisplay, kgToDisplay, lengthUnit, weightUnit } from "@/lib/units";
+import { cmToDisplay, kgToDisplay, weightUnit } from "@/lib/units";
 import type { User } from "@/lib/types";
 
 /** The by-hand version. Every field optional. */
@@ -40,7 +40,7 @@ export default function ProfileFields({
         </div>
         <div>
           <label className="label" htmlFor="height">
-            Height ({lengthUnit(units)})
+            Height ({units === "imperial" ? "in" : "cm"})
           </label>
           <input
             id="height"

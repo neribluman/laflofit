@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cmToDisplay, kgToDisplay, lengthUnit, weightUnit } from "@/lib/units";
+import { cmToDisplay, fmtHeight, kgToDisplay, lengthUnit, weightUnit } from "@/lib/units";
 import { ageFrom, energyEstimate, missingForEnergy } from "@/lib/profile";
 import type { Measurement, User } from "@/lib/types";
 
@@ -82,10 +82,7 @@ export default function BiomarkerGrid({
       sub: waist.on,
     },
     hr && { label: "Resting HR", value: `${hr.value} bpm`, sub: hr.on },
-    heightCm && {
-      label: "Height",
-      value: `${cmToDisplay(heightCm, units).toFixed(1)} ${lengthUnit(units)}`,
-    },
+    heightCm && { label: "Height", value: fmtHeight(heightCm, units) },
     user.goal_weight_kg && {
       label: "Goal",
       value: `${kgToDisplay(user.goal_weight_kg, units).toFixed(1)} ${weightUnit(units)}`,

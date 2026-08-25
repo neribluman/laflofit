@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { crewById, currentUser, plansForCrew } from "@/lib/data";
 import { todayIn } from "@/lib/dates";
 import { canInterpret } from "@/lib/interpret";
-import { lengthUnit, weightUnit } from "@/lib/units";
 import PlanStep from "./PlanStep";
 import IntakeSurvey from "./IntakeSurvey";
 
@@ -42,8 +41,7 @@ export default async function Onboarding({
       <main className="mx-auto w-full max-w-md px-5 pt-10 pb-16">
         <IntakeSurvey
           thisYear={Number(today.slice(0, 4))}
-          weightUnit={weightUnit(user.units)}
-          lengthUnit={lengthUnit(user.units)}
+          initialUnits={user.units}
           skipAllHref="/onboarding?skip=1"
         />
       </main>

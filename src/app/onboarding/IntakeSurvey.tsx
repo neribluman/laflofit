@@ -7,7 +7,7 @@ import { saveIntake, type IntakeAnswers } from "@/app/(app)/profile-actions";
 import { ACTIVITY_LEVELS } from "@/lib/profile";
 import AvatarPicker from "@/components/AvatarPicker";
 
-type StepKind = "number" | "choice" | "text" | "photo";
+type StepKind = "number" | "choice" | "text" | "photo" | "height";
 
 type Step = {
   key: keyof IntakeAnswers;
@@ -16,12 +16,17 @@ type Step = {
   note?: string;
   suffix?: string;
   placeholder?: string;
+  /** Show the kg/lb switch on this step. */
+  units?: boolean;
   choices?: { value: string; label: string; sub?: string }[];
 };
 
 const EMPTY: IntakeAnswers = {
   photo: "",
+  units: "metric",
   age: "",
+  heightFeet: "",
+  heightInches: "",
   sex: "",
   height: "",
   weight: "",
@@ -32,16 +37,21 @@ const EMPTY: IntakeAnswers = {
 
 export default function IntakeSurvey({
   thisYear,
-  weightUnit,
-  lengthUnit,
+  initialUnits,
   skipAllHref,
 }: {
   thisYear: number;
-  weightUnit: string;
-  lengthUnit: string;
+  initialUnits: "metric" | "imperial";
   skipAllHref: string;
 }) {
   const router = useRouter();
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<IntakeAnswers>({
+    ...EMPTY,
+    units: initialUnits,
+  });
+  const imperial = answers.units === "imperial";
+  const weightUnit = imperial ? "lb" : "kg";
   const steps: Step[] = [
     {
       key: "photo",
@@ -70,10 +80,8 @@ export default function IntakeSurvey({
     },
     {
       key: "height",
-      kind: "number",
+      kind: "height",
       question: "How tall are you?",
-      suffix: lengthUnit,
-      placeholder: lengthUnit === "cm" ? "181" : "71",
     },
     {
       key: "weight",
@@ -81,7 +89,8 @@ export default function IntakeSurvey({
       question: "What do you weigh now?",
       note: "This becomes the first point on your chart.",
       suffix: weightUnit,
-      placeholder: weightUnit === "kg" ? "84" : "185",
+      placeholder: imperial ? "185" : "84",
+      units: true,
     },
     {
       key: "goalWeight",
@@ -89,7 +98,8 @@ export default function IntakeSurvey({
       question: "Where are you heading?",
       note: "Leave it blank if you're not chasing a number.",
       suffix: weightUnit,
-      placeholder: weightUnit === "kg" ? "78" : "172",
+      placeholder: imperial ? "172" : "78",
+      units: true,
     },
     {
       key: "activity",
@@ -109,12 +119,11 @@ export default function IntakeSurvey({
     },
   ];
 
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<IntakeAnswers>(EMPTY);
   const [saving, startSaving] = useTransition();
 
   const step = steps[index];
-  const value = answers[step.key];
+  const value =
+    step.kind === "height" && imperial ? answers.heightFeet : answers[step.key];
   const last = index === steps.length - 1;
 
   const set = (next: string) =>
@@ -160,6 +169,86 @@ export default function IntakeSurvey({
         {step.note && <p className="mt-1.5 text-sm text-muted">{step.note}</p>}
 
         <div className="mt-5">
+          {(step.units || step.kind === "height") && (
+            <div className="mb-4 inline-grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
+              {(
+                [
+                  ["metric", step.kind === "height" ? "cm" : "kg"],
+                  ["imperial", step.kind === "height" ? "ft / in" : "lb"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() =>
+                    setAnswers((prev) => ({ ...prev, units: value }))
+                  }
+                  aria-pressed={answers.units === value}
+                  className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+                    answers.units === value
+                      ? "bg-accent text-accent-ink"
+                      : "text-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {step.kind === "height" && (
+            imperial ? (
+              <div className="flex items-baseline gap-2">
+                <input
+                  autoFocus
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={answers.heightFeet}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({ ...prev, heightFeet: e.target.value }))
+                  }
+                  placeholder="5"
+                  aria-label="Height in feet"
+                  className="field nums w-24 text-3xl font-bold"
+                />
+                <span className="text-sm text-muted">ft</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={11}
+                  value={answers.heightInches}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({ ...prev, heightInches: e.target.value }))
+                  }
+                  onKeyDown={(e) => e.key === "Enter" && advance()}
+                  placeholder="11"
+                  aria-label="Height in inches"
+                  className="field nums w-24 text-3xl font-bold"
+                />
+                <span className="text-sm text-muted">in</span>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-3">
+                <input
+                  autoFocus
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min={0}
+                  value={answers.height}
+                  onChange={(e) => set(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && advance()}
+                  placeholder="181"
+                  aria-label="Height in centimetres"
+                  className="field nums w-40 text-3xl font-bold"
+                />
+                <span className="text-sm text-muted">cm</span>
+              </div>
+            )
+          )}
+
           {step.kind === "choice" && (
             <div className="space-y-2">
               {step.choices!.map((choice) => (

@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { currentUser } from "@/lib/data";
-import { displayToCm, displayToKg } from "@/lib/units";
-import type { User } from "@/lib/types";
+import { displayToCm, displayToKg, feetInchesToCm } from "@/lib/units";
+import type { Units, User } from "@/lib/types";
 
 async function requireUser(): Promise<User> {
   const user = await currentUser();
@@ -49,7 +49,11 @@ export async function saveProfileFields(formData: FormData) {
 export type IntakeAnswers = {
   /** Marker only. The photo saves itself the moment it's taken. */
   photo: string;
+  /** Chosen during the survey — everything below is in these units. */
+  units: "metric" | "imperial";
   age: string;
+  heightFeet: string;
+  heightInches: string;
   sex: string;
   height: string;
   weight: string;
@@ -70,19 +74,36 @@ export async function saveIntake(answers: IntakeAnswers, thisYear: number) {
     const parsed = Number(String(raw).trim());
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   };
+  const zeroOk = (raw: string) => {
+    const parsed = Number(String(raw).trim());
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  };
+
+  // Convert with the units chosen in the survey, not whatever the account
+  // happened to be set to beforehand.
+  const units: Units =
+    answers.units === "imperial" ? "imperial" : "metric";
 
   const age = num(answers.age);
-  const height = num(answers.height);
   const weight = num(answers.weight);
   const goal = num(answers.goalWeight);
   const about = answers.about.trim().slice(0, 600);
+
+  const heightCm =
+    units === "imperial"
+      ? num(answers.heightFeet)
+        ? feetInchesToCm(num(answers.heightFeet)!, zeroOk(answers.heightInches))
+        : null
+      : num(answers.height);
+
+  await sql`update users set units = ${units} where id = ${user.id}`;
 
   await sql`
     update users set
       birth_year     = ${age && age < 120 ? thisYear - Math.round(age) : null},
       sex            = ${["male", "female", "other"].includes(answers.sex) ? answers.sex : null},
-      height_cm      = ${height == null ? null : displayToCm(height, user.units)},
-      goal_weight_kg = ${goal == null ? null : displayToKg(goal, user.units)},
+      height_cm      = ${heightCm},
+      goal_weight_kg = ${goal == null ? null : displayToKg(goal, units)},
       activity_level = ${
         ["sedentary", "light", "moderate", "very"].includes(answers.activity)
           ? answers.activity
@@ -95,7 +116,7 @@ export async function saveIntake(answers: IntakeAnswers, thisYear: number) {
   if (weight != null) {
     await sql`
       insert into measurements (user_id, measured_on, weight_kg)
-      values (${user.id}, current_date, ${displayToKg(weight, user.units)})
+      values (${user.id}, current_date, ${displayToKg(weight, units)})
       on conflict (user_id, measured_on) do update set weight_kg = excluded.weight_kg
     `;
   }

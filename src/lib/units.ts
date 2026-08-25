@@ -34,3 +34,25 @@ export function displayToKm(v: number, units: Units): number {
   return units === "imperial" ? v / MI_PER_KM : v;
 }
 export const distanceUnit = (units: Units) => (units === "imperial" ? "mi" : "km");
+
+const IN_PER_FOOT = 12;
+
+/** Feet and inches from centimetres — 181cm is 5'11", not 71.3 inches. */
+export function cmToFeetInches(cm: number): { feet: number; inches: number } {
+  const totalInches = Math.round(cm * IN_PER_CM);
+  return {
+    feet: Math.floor(totalInches / IN_PER_FOOT),
+    inches: totalInches % IN_PER_FOOT,
+  };
+}
+
+export const feetInchesToCm = (feet: number, inches: number) =>
+  (feet * IN_PER_FOOT + inches) / IN_PER_CM;
+
+/** How a height should read back: "181 cm" or "5'11"". */
+export function fmtHeight(cm: number | null, units: Units): string {
+  if (cm == null) return "—";
+  if (units === "metric") return `${cm.toFixed(0)} cm`;
+  const { feet, inches } = cmToFeetInches(cm);
+  return `${feet}'${inches}"`;
+}
