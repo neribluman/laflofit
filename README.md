@@ -13,7 +13,7 @@ rules, so it works for any diet.
 
 | Screen | What's on it |
 |---|---|
-| **Log** | A month at a glance — one cell per day, darker for a better day, so runs and gaps are both visible — with that month's days logged, average score, average calories and average protein underneath. Tap any day to open it, or tap the date to jump anywhere. Everything below then reads and writes that day, so a forgotten Tuesday can be filled in on Friday. |
+| **Log** | A strip of seven days with the one you're on in the middle, darker for a better day, and that month's totals on one line — days logged, average score, average calories, average protein. Tap a neighbouring day to move, or the date to jump anywhere. Everything below then reads and writes that day, so a forgotten Tuesday can be filled in on Friday. |
 | **Me** | Your biomarkers — weight, height, BMI, body fat, waist, resting heart rate, goal, and an estimate of your maintenance calories — with somewhere to add a new reading, the weight trend, your training history, and settings. |
 | **About you** | Asked once at sign-up as eight quick questions — starting with a photo then age, sex, height, weight, goal, a normal week, and anything else worth knowing. Every later analysis gets this, so portions are judged against you rather than an average person, and it will tell you when a logged meal contradicts it. Every question is skippable, and it all stays editable from Me. |
 | **Crew** | The tab the app opens on. Who's logged today, four leaderboards, 30-day weight movement, and a feed of everything the crew logged with reactions and comments. |

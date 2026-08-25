@@ -12,8 +12,8 @@ import {
 } from "@/lib/data";
 import {
   addDays,
-  addMonths,
   monthDays,
+  monthLabel,
   prettyDate,
   startOfWeek,
   todayIn,
@@ -22,7 +22,7 @@ import { currentStreak, scoreDay } from "@/lib/scoring";
 import { canInterpret } from "@/lib/interpret";
 import { distanceUnit, fmtWeight, weightUnit } from "@/lib/units";
 import ScoreRing from "@/components/ScoreRing";
-import MonthGrid, { type MonthDay, type MonthTotals } from "@/components/MonthGrid";
+import DayStrip, { type StripDay, type PeriodTotals } from "@/components/DayStrip";
 import CheckInList from "./CheckInList";
 import NaturalLog from "./NaturalLog";
 import ResetDay from "./ResetDay";
@@ -106,7 +106,7 @@ export default async function TodayPage({
     new Map([...scoreByDate].map(([k, v]) => [k, v.perfect])),
   );
 
-  const monthGrid: MonthDay[] = monthDays(month).map((day) => {
+  const monthGrid: StripDay[] = monthDays(month).map((day) => {
     const score = scoreByDate.get(day);
     return {
       date: day,
@@ -136,7 +136,7 @@ export default async function TodayPage({
   const mean = (nums: number[]) =>
     nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null;
 
-  const monthTotals: MonthTotals = {
+  const monthTotals: PeriodTotals = {
     daysLogged: loggedDays.length,
     averageScore: mean(loggedDays.map((day) => day.ratio * 100)) ?? 0,
     averageCalories: mean(foodDays.map((f) => f.kcal)),
@@ -218,18 +218,12 @@ export default async function TodayPage({
       </header>
 
       <div className="lg:max-w-xl">
-        <MonthGrid
-          month={month}
+        <DayStrip
           days={monthGrid}
-          totals={monthTotals}
           selected={date}
           today={today}
-          prevHref={`/today?d=${date}&m=${addMonths(month, -1)}`}
-          nextHref={
-            `${addMonths(month, 1)}-01` <= today
-              ? `/today?d=${date}&m=${addMonths(month, 1)}`
-              : null
-          }
+          totals={monthTotals}
+          totalsLabel={monthLabel(month)}
         />
       </div>
 
