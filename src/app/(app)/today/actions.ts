@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sql, sqlOne } from "@/lib/db";
 import { currentUser, measurementsFor, planWithRules } from "@/lib/data";
-import { interpretDay, macroTotals, type DayReport } from "@/lib/interpret";
+import {
+  interpretDay,
+  interpretPlate,
+  macroTotals,
+  type DayReport,
+} from "@/lib/interpret";
 import { describePerson } from "@/lib/profile";
 import { displayToKg, displayToKm } from "@/lib/units";
 import { WORKOUT_KINDS } from "@/lib/presets";
@@ -86,6 +91,50 @@ export async function readDay(date: string, text: string): Promise<ReadResult> {
       error: message.includes("api_key") || message.includes("authentication")
         ? "The Claude API key isn't set up. See the README."
         : message,
+    };
+  }
+}
+
+/** Read a photo of a plate into a proposal. Writes nothing; the photo is not kept. */
+export async function readPlate(
+  date: string,
+  imageDataUrl: string,
+): Promise<ReadResult> {
+  const user = await requireUser();
+  if (!user.active_plan_id) return { ok: false, error: "No plan to log against." };
+
+  // A 1024px JPEG is a few hundred KB; past 6MB something else has arrived.
+  if (imageDataUrl.length > 6_000_000) {
+    return { ok: false, error: "That photo is too big. Try taking it again." };
+  }
+
+  const planned = await planWithRules(user.active_plan_id);
+  if (!planned) return { ok: false, error: "No plan to log against." };
+
+  const weighIns = await measurementsFor([user.id]);
+  const latestWeight =
+    [...weighIns].reverse().find((m) => m.weight_kg != null)?.weight_kg ?? null;
+
+  try {
+    const report = await interpretPlate({
+      imageDataUrl,
+      rules: planned.rules,
+      units: user.units,
+      person: describePerson(user, latestWeight, date),
+    });
+    return {
+      ok: true,
+      report,
+      labels: Object.fromEntries(planned.rules.map((r) => [r.id, r.label])),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong.";
+    return {
+      ok: false,
+      error:
+        message.includes("api_key") || message.includes("authentication")
+          ? "The Claude API key isn't set up. See the README."
+          : message,
     };
   }
 }

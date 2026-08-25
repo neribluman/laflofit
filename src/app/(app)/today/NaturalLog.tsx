@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { readDay, applyDay, type ReadResult } from "./actions";
+import { readDay, readPlate, applyDay, type ReadResult } from "./actions";
+import { shrinkImage } from "@/lib/image";
 import type { DayReport } from "@/lib/interpret";
 import { macroTotals } from "@/lib/macros";
 import { describeExercise } from "@/lib/exercise-format";
@@ -30,6 +31,8 @@ export default function NaturalLog({
   const [applied, setApplied] = useState(false);
   const [reading, startReading] = useTransition();
   const [applying, startApplying] = useTransition();
+  const [photo, setPhoto] = useState<string | null>(null);
+  const camera = useRef<HTMLInputElement>(null);
   const reviewRef = useRef<HTMLDivElement>(null);
 
   // Once there's something to check, put it in front of them. Otherwise the
@@ -44,8 +47,24 @@ export default function NaturalLog({
   const read = () =>
     startReading(async () => {
       setApplied(false);
+      setPhoto(null);
       setResult(await readDay(date, text));
     });
+
+  const readPhoto = (file: File | undefined) => {
+    if (!file) return;
+    startReading(async () => {
+      setApplied(false);
+      try {
+        const shrunk = await shrinkImage(file);
+        setPhoto(shrunk);
+        setResult(await readPlate(date, shrunk));
+      } catch {
+        setPhoto(null);
+        setResult({ ok: false, error: "Couldn't read that image. Try another." });
+      }
+    });
+  };
 
   const apply = (report: DayReport) =>
     startApplying(async () => {
@@ -53,6 +72,7 @@ export default function NaturalLog({
       setApplied(true);
       setResult(null);
       setText("");
+      setPhoto(null);
     });
 
   if (applied) {
@@ -73,14 +93,32 @@ export default function NaturalLog({
     return (
       <div className="card p-4" ref={reviewRef}>
         <div className="flex items-start gap-3">
-          <p className="min-w-0 flex-1 text-sm text-muted">
-            <span className="line-clamp-2 italic">&ldquo;{text}&rdquo;</span>
-          </p>
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={photo}
+              alt="The plate you photographed"
+              className="h-16 w-16 shrink-0 rounded-xl object-cover"
+            />
+          ) : (
+            <p className="min-w-0 flex-1 text-sm text-muted">
+              <span className="line-clamp-2 italic">&ldquo;{text}&rdquo;</span>
+            </p>
+          )}
+          {photo && (
+            <p className="min-w-0 flex-1 text-sm text-muted">
+              From your photo. Portions are estimated from the picture — check
+              them.
+            </p>
+          )}
           <button
-            onClick={() => setResult(null)}
+            onClick={() => {
+              setResult(null);
+              setPhoto(null);
+            }}
             className="btn-quiet shrink-0 px-2 py-1 text-xs"
           >
-            Edit
+            {photo ? "Retake" : "Edit"}
           </button>
         </div>
 
@@ -123,7 +161,9 @@ export default function NaturalLog({
 
       {reading && (
         <div className="mt-3 space-y-2" aria-live="polite">
-          <p className="text-sm text-muted">Analysing your day…</p>
+          <p className="text-sm text-muted">
+            {photo ? "Looking at your plate…" : "Analysing your day…"}
+          </p>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -142,19 +182,36 @@ export default function NaturalLog({
         >
           {reading ? "Analysing…" : "Analyse my day"}
         </button>
-        {text.length === 0 && (
-          <button
-            type="button"
-            onClick={() => setText(EXAMPLE)}
-            className="btn-quiet px-3 text-xs"
-          >
-            Example
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => camera.current?.click()}
+          disabled={reading}
+          aria-label="Photograph your plate"
+          title="Photograph your plate"
+          className="btn-ghost shrink-0 px-3"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 8.5A1.5 1.5 0 014.5 7h2L8 5h8l1.5 2h2A1.5 1.5 0 0121 8.5v9A1.5 1.5 0 0119.5 19h-15A1.5 1.5 0 013 17.5z" />
+            <circle cx="12" cy="13" r="3.2" />
+          </svg>
+        </button>
       </div>
 
+      <input
+        ref={camera}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        onChange={(e) => {
+          readPhoto(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+
       <p className="mt-2 text-center text-xs text-muted">
-        Food, training, weight, how it went — all of it, in one go.
+        Food, training, weight, how it went — all of it, in one go. Or
+        photograph your plate.
       </p>
 
       {fallbackHref && (

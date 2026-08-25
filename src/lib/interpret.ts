@@ -265,3 +265,88 @@ export async function interpretPlanRequest({
   if (!parsed) throw new Error("Could not read that. Try rephrasing?");
   return parsed;
 }
+
+// ---------------------------------------------------------------------------
+// Reading a photograph of a plate
+// ---------------------------------------------------------------------------
+
+const PLATE_SYSTEM = `You are looking at a photograph of food someone is about to eat, and turning it into log entries for a diet tracker.
+
+- One entry per distinct item you can actually see. Chicken and rice on one plate are two entries, not one "chicken and rice".
+- Portions have to be estimated from the picture. Use what is in shot for scale — the plate, cutlery, a glass, a hand — and say what you assumed in the description: "grilled chicken breast (assumed ~180g, about the width of the fork)". An estimate you have explained can be corrected; a bare number cannot.
+- Estimate calories, protein, carbs, fat and fibre for each item.
+- Do not invent what you cannot see. If something is hidden under a sauce or behind another dish, say so in unclear rather than guessing at it.
+- Sauces, dressings and cooking oil are usually invisible and usually significant. If a dish looks dressed, fried or glazed, account for it in the fat and say you have.
+- If the picture has no food in it, return no meals and say what you did see in unclear.
+
+You may also be told the person's plan. Judge a rule only where the photograph settles it — bread in shot settles "no white carbs"; nothing in the picture can tell you what they drank this morning.`;
+
+export async function interpretPlate({
+  imageDataUrl,
+  rules,
+  units,
+  person,
+}: {
+  imageDataUrl: string;
+  rules: PlanRule[];
+  units: Units;
+  person?: string;
+}): Promise<DayReport> {
+  const client = new Anthropic();
+
+  const match = imageDataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+  if (!match) throw new Error("That doesn't look like a photo.");
+  const [, mediaType, base64] = match;
+
+  const ruleSheet = rules.map((rule) => ({
+    id: rule.id,
+    label: rule.label,
+    kind: rule.kind,
+    unit: rule.unit,
+    target: rule.target,
+    cadence: rule.cadence,
+  }));
+
+  const response = await client.messages.parse({
+    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
+    max_tokens: 8000,
+    system: PLATE_SYSTEM,
+    output_config: { effort: "medium", format: zodOutputFormat(DayReport) },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mediaType as "image/jpeg" | "image/png" | "image/webp",
+              data: base64,
+            },
+          },
+          {
+            type: "text",
+            text: [
+              person ? `About them: ${person}\n` : "",
+              `Their plan's rules:\n${JSON.stringify(ruleSheet, null, 1)}`,
+              `\nThey weigh themselves in ${weightUnit(units)}.`,
+              `\nWhat is on this plate?`,
+            ].join("\n"),
+          },
+        ],
+      },
+    ],
+  });
+
+  const parsed = response.parsed_output;
+  if (!parsed) throw new Error("Couldn't read that photo. Try another?");
+
+  const known = new Set(rules.map((rule) => rule.id));
+  return {
+    ...parsed,
+    rules: parsed.rules.filter((r) => known.has(r.rule_id)),
+    // A photograph of a plate says nothing about training or bodyweight.
+    workouts: [],
+    weight: null,
+  };
+}
