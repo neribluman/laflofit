@@ -75,18 +75,6 @@ export default function NaturalLog({
       setPhoto(null);
     });
 
-  if (applied) {
-    return (
-      <div className="card flex items-center gap-3 border-accent/50 bg-accent/5 p-4">
-        <span className="text-xl">✓</span>
-        <p className="flex-1 text-sm">Logged. Everything below is updated.</p>
-        <button onClick={() => setApplied(false)} className="btn-quiet px-2 py-1 text-xs">
-          Add more
-        </button>
-      </div>
-    );
-  }
-
   // While reviewing, what they wrote collapses to a quiet line with a way back
   // to it. Two big green buttons on screen at once is the whole problem.
   if (reviewing && result?.ok) {
@@ -146,13 +134,26 @@ export default function NaturalLog({
 
   return (
     <div className="card p-4">
+      {applied && (
+        <p
+          aria-live="polite"
+          className="mb-3 flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/5 px-3 py-2 text-sm"
+        >
+          <span aria-hidden>✓</span>
+          Logged, and added below. Anything else?
+        </p>
+      )}
+
       <label className="label" htmlFor="day-text">
         Just tell me about your day
       </label>
       <textarea
         id="day-text"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (applied) setApplied(false);
+        }}
         rows={prominent ? 6 : 3}
         maxLength={2000}
         placeholder={EXAMPLE}
