@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { weekdayLetter } from "@/lib/dates";
 import type { WeekStanding } from "@/lib/scoring";
 import type { BoardEntry, BoardKey } from "@/lib/boards";
 import Avatar from "./Avatar";
+import { ensureRoast } from "@/app/(app)/crew/roast-actions";
+import type { Roast } from "@/lib/roast";
 
 export type LeaderRow = {
   id: string;
@@ -52,9 +54,31 @@ const BOARDS: { key: BoardKey; tab: string; note: string }[] = [
   },
 ];
 
-export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
+export default function Leaderboard({
+  rows,
+  roastable = false,
+}: {
+  rows: LeaderRow[];
+  roastable?: boolean;
+}) {
   const [board, setBoard] = useState<BoardKey>("overall");
   const [open, setOpen] = useState<string | null>(null);
+  const [roast, setRoast] = useState<Roast | null>(null);
+
+  // Fetched after paint. The numbers are the page; the ribbing arrives a beat
+  // later, which is roughly how it works in person too.
+  useEffect(() => {
+    if (!roastable) return;
+    let live = true;
+    ensureRoast()
+      .then((result) => live && result && setRoast(result))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [roastable]);
+
+  const quips = new Map((roast?.lines ?? []).map((line) => [line.name, line.line]));
 
   const current = BOARDS.find((b) => b.key === board)!;
 
@@ -100,6 +124,12 @@ export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
           </button>
         ))}
       </div>
+
+      {roast && board === "overall" && (
+        <p className="mb-4 text-center text-xs text-muted italic">
+          {roast.verdict}
+        </p>
+      )}
 
       <ol className="space-y-3">
         {scored.map((row, i) => {
@@ -176,6 +206,12 @@ export default function Leaderboard({ rows }: { rows: LeaderRow[] }) {
                         }${row.standing.loggedToday ? "" : " · not today"}`
                     : entry.detail}
                 </p>
+
+                {board === "overall" && quips.has(row.name) && (
+                  <p className="mt-0.5 ml-7 text-xs text-text italic">
+                    {quips.get(row.name)}
+                  </p>
+                )}
               </button>
 
               {expanded && (

@@ -30,7 +30,6 @@ import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
 import InviteCode from "./InviteCode";
-import RoastCard from "./RoastCard";
 import { canInterpret } from "@/lib/interpret";
 
 type FeedItem = {
@@ -314,22 +313,8 @@ export default async function CrewPage() {
 
       <section>
         <h2 className="label">This week</h2>
-        <Leaderboard rows={rows} />
+        <Leaderboard rows={rows} roastable={canInterpret()} />
       </section>
-
-      {canInterpret() && (
-        <section>
-          <h2 className="label">The ruling</h2>
-          <RoastCard
-            faces={rows.map((row) => ({
-              id: row.id,
-              name: row.name,
-              emoji: row.emoji,
-              hasAvatar: row.hasAvatar,
-            }))}
-          />
-        </section>
-      )}
 
       {movement.length > 0 && (
         <section>
