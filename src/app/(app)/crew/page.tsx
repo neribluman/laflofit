@@ -13,7 +13,7 @@ import {
   rulesForPlans,
   workoutsBetween,
 } from "@/lib/data";
-import { addDays, prettyDate, todayIn } from "@/lib/dates";
+import { addDays, daysBetween, prettyDate, todayIn } from "@/lib/dates";
 import { lastNDays } from "@/lib/dates";
 import { scoreDay, standingFor } from "@/lib/scoring";
 import { kgToDisplay, weightUnit } from "@/lib/units";
@@ -135,14 +135,17 @@ export default async function CrewPage() {
         emoji: member.emoji,
         hasAvatar: member.has_avatar,
         isMe: member.id === user.id,
+        daysInCrew: Math.max(1, daysBetween(member.created_at.slice(0, 10), today) + 1),
         standing,
         boards: {
           overall: {
-            // Seven days at up to 100 each, so the raw total tops out at 700 —
-            // a denominator nobody can see and therefore nobody can read. Shown
-            // as the share of a perfect week instead; the ranking is identical.
+            // The score is days multiplied by how much of the plan you kept, so
+            // what it counts is clean days: follow the day completely and it is
+            // worth one, half-follow it and it is worth half, never log it and
+            // it is worth nothing. Shown that way because that sentence is the
+            // whole model, and 339-out-of-an-invisible-700 was not.
             value: standing.points,
-            display: `${Math.round(standing.points / 7)}%`,
+            display: `${(standing.points / 100).toFixed(1)}/7`,
             detail: "",
             missing: false,
           },

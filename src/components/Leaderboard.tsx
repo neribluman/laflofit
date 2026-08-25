@@ -14,6 +14,8 @@ export type LeaderRow = {
   emoji: string;
   hasAvatar: boolean;
   isMe: boolean;
+  /** 1 on the day they joined — they can't have skipped days that predate them. */
+  daysInCrew: number;
   standing: WeekStanding;
   boards: Record<BoardKey, BoardEntry>;
 };
@@ -30,7 +32,7 @@ const BOARDS: { key: BoardKey; tab: string; note: string }[] = [
   {
     key: "overall",
     tab: "Overall",
-    note: "Your share of a perfect week. Each of the seven days is worth up to 100, and how much of that you get is how much of your plan you hit — so a day you never log costs you the whole 100.",
+    note: "Clean days out of seven. Follow a day completely and it counts as one; half-follow it and it counts as half; never log it and it counts as nothing.",
   },
   {
     key: "training",
@@ -198,12 +200,20 @@ export default function Leaderboard({
                 <p className="nums mt-1 ml-7 text-xs text-muted">
                   {board === "overall"
                     ? row.standing.daysLogged === 0
-                      ? "nothing logged yet"
-                      : `${row.standing.daysLogged} day${row.standing.daysLogged === 1 ? "" : "s"} · ${row.standing.average} avg${
+                      ? row.daysInCrew <= 1
+                        ? "joined today · nothing logged yet"
+                        : "nothing logged yet"
+                      : `${row.standing.daysLogged} day${row.standing.daysLogged === 1 ? "" : "s"} logged · ${row.standing.average}% of plan${
                           row.standing.perfectDays > 0
                             ? ` · ${row.standing.perfectDays} perfect`
                             : ""
-                        }${row.standing.loggedToday ? "" : " · not today"}`
+                        }${row.standing.loggedToday ? "" : " · not today"}${
+                          row.daysInCrew < 7
+                            ? row.daysInCrew <= 1
+                              ? " · joined today"
+                              : ` · joined ${row.daysInCrew} days ago`
+                            : ""
+                        }`
                     : entry.detail}
                 </p>
 
