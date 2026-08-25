@@ -146,6 +146,21 @@ export default async function CrewPage({
 
       const standing = standingFor(week, scoreByDate, today);
 
+      // ---- and the same person, for the one selected day ----------------
+      const dayScore = scoreIndex.get(`${member.id}|${day}`) ?? null;
+      const theirDayMeals = dayMeals.filter((meal) => meal.user_id === member.id);
+      const theirDayWorkouts = theirWorkouts.filter((w) => w.workout_date === day);
+      const dayWorkoutIds = new Set(theirDayWorkouts.map((w) => w.id));
+      const theirDayExercises = theirExercises.filter((e) =>
+        dayWorkoutIds.has(e.workout_id),
+      );
+      const dayCalories = theirDayMeals.reduce(
+        (sum, meal) => sum + (meal.calories ?? 0),
+        0,
+      );
+      const daySessions = theirDayWorkouts.length;
+      const dayMinutes = theirDayWorkouts.reduce((sum, w) => sum + (w.minutes ?? 0), 0);
+
       return {
         id: member.id,
         name: member.display_name,
@@ -175,12 +190,50 @@ export default async function CrewPage({
           calories: calorieBoard(theirMeals, member, theirRules, weightKg, today),
           strength: strengthBoard(theirExercises, weightKg),
         },
+        dayBoards: {
+          overall: {
+            value: dayScore ? Math.round(dayScore.ratio * 100) : -1,
+            display: dayScore ? `${Math.round(dayScore.ratio * 100)}` : "—",
+            detail: dayScore
+              ? [
+                  theirDayMeals.length
+                    ? `${dayCalories.toLocaleString()} kcal`
+                    : null,
+                  ...theirDayWorkouts.map(
+                    (w) => `${w.kind}${w.minutes ? ` ${w.minutes} min` : ""}`,
+                  ),
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "logged, nothing else recorded"
+              : "didn't log",
+            missing: !dayScore,
+          },
+          training: {
+            // Sessions first, minutes only to break a tie — the same reason
+            // the weekly board counts days: lifting rarely carries a duration.
+            value: daySessions * 1000 + dayMinutes,
+            display: daySessions
+              ? `${daySessions} session${daySessions === 1 ? "" : "s"}`
+              : "—",
+            detail: daySessions
+              ? theirDayWorkouts
+                  .map((w) => `${w.kind}${w.minutes ? ` ${w.minutes} min` : ""}`)
+                  .join(" · ")
+              : "no training",
+            missing: false,
+          },
+          protein: proteinBoard(theirDayMeals, weightKg),
+          calories: calorieBoard(theirDayMeals, member, theirRules, weightKg, day),
+          strength: strengthBoard(theirDayExercises, weightKg),
+        },
       };
     })
     .sort((a, b) => b.standing.points - a.standing.points);
 
   const loggedTodayCount = rows.filter((row) => row.standing.loggedToday).length;
 
+
+  const dayMeals = await mealsBetween(ids, day, day);
 
   // ---- The selected day, summarised under the strip ----------------------
   const dayRows = roster
@@ -405,8 +458,12 @@ export default async function CrewPage({
       </section>
 
       <section>
-        <h2 className="label">This week</h2>
-        <Leaderboard rows={rows} roastable={canInterpret()} />
+        <h2 className="label">Standings</h2>
+        <Leaderboard
+          rows={rows}
+          roastable={canInterpret()}
+          dayLabel={day === today ? "Today" : prettyDate(day, today)}
+        />
       </section>
 
       {movement.length > 0 && (

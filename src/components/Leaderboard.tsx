@@ -18,6 +18,8 @@ export type LeaderRow = {
   daysInCrew: number;
   standing: WeekStanding;
   boards: Record<BoardKey, BoardEntry>;
+  /** The same five boards, for the one selected day. */
+  dayBoards: Record<BoardKey, BoardEntry>;
 };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -28,41 +30,52 @@ const listOf = (names: string[]) =>
     ? (names[0] ?? "")
     : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
-const BOARDS: { key: BoardKey; tab: string; note: string }[] = [
+const BOARDS: { key: BoardKey; tab: string; note: string; dayNote?: string }[] = [
   {
     key: "overall",
     tab: "Overall",
     note: "Clean days out of seven. Follow a day completely and it counts as one; half-follow it and it counts as half; never log it and it counts as nothing.",
+    dayNote: "How much of your plan you kept on this one day, out of 100. Whoever comes first among the people who logged takes it — turning up when nobody else did still counts.",
   },
   {
     key: "training",
     tab: "Training",
     note: "Days you trained this week — a class, a walk and a lifting day each count once. Minutes aren't the measure: free text rarely says how long a gym session took, and counting them would put the lifters last.",
+    dayNote: "Sessions logged on this day. Ties break on minutes, but sessions come first — a lifting session rarely says how long it took.",
   },
   {
     key: "protein",
     tab: "Protein",
     note: "Grams of protein per kilo of bodyweight, averaged over the days you logged food. Most strength plans aim somewhere between 1.6 and 2.2.",
+    dayNote: "Grams of protein per kilo of bodyweight on this day. Most strength plans aim between 1.6 and 2.2.",
   },
   {
     key: "calories",
     tab: "Calories",
     note: "How close you stayed to the target that gets you to your goal weight — maintenance less a deficit if you want to lose, maintenance if you're holding. Eating under counts against you as much as eating over. Tap a row to see where that number came from.",
+    dayNote: "How close this one day's eating came to the target that gets you to your goal weight. 100 is dead on; over and under cost the same. Tap a row for where the target came from.",
   },
   {
     key: "strength",
     tab: "Strength",
     note: "Your best estimated single on squat, bench, deadlift and overhead press, added together and divided by your bodyweight.",
+    dayNote: "Estimated singles on squat, bench, deadlift and overhead press from this day's lifts, divided by bodyweight.",
   },
 ];
 
 export default function Leaderboard({
   rows,
   roastable = false,
+  dayLabel = "Today",
 }: {
   rows: LeaderRow[];
   roastable?: boolean;
+  /** Which day the day view is showing — follows the strip above. */
+  dayLabel?: string;
 }) {
+  // A day is what people actually want to know about; the week is the argument
+  // they settle on Sunday. So the day leads.
+  const [period, setPeriod] = useState<"day" | "week">("day");
   const [board, setBoard] = useState<BoardKey>("overall");
   const [open, setOpen] = useState<string | null>(null);
   const [roast, setRoast] = useState<Roast | null>(null);
@@ -84,29 +97,31 @@ export default function Leaderboard({
   const quips = new Map((roast?.lines ?? []).map((line) => [line.name, line.line]));
 
   const current = BOARDS.find((b) => b.key === board)!;
+  const isDay = period === "day";
+  const entryFor = (row: LeaderRow) =>
+    isDay ? row.dayBoards[board] : row.boards[board];
 
   const ranked = [...rows].sort((a, b) => {
-    const left = a.boards[board];
-    const right = b.boards[board];
+    const left = entryFor(a);
+    const right = entryFor(b);
     if (left.missing !== right.missing) return left.missing ? 1 : -1;
     return right.value - left.value;
   });
 
-  const scored = ranked.filter((row) => !row.boards[board].missing);
+  const scored = ranked.filter((row) => !entryFor(row).missing);
 
   // Competition ranking — equal scores take the same place, and the next
   // distinct score picks up after them. 1, 2, 2, 4.
   const ranks = scored.map(
-    (row) =>
-      scored.findIndex((other) => other.boards[board].value === row.boards[board].value) + 1,
+    (row) => scored.findIndex((other) => entryFor(other).value === entryFor(row).value) + 1,
   );
-  const absent = ranked.filter((row) => row.boards[board].missing);
-  const best = Math.max(...scored.map((row) => row.boards[board].value), 0.0001);
+  const absent = ranked.filter((row) => entryFor(row).missing);
+  const best = Math.max(...scored.map((row) => entryFor(row).value), 0.0001);
 
   // Everyone left out for the same reason gets one line between them.
   const sidelined = [...
     absent.reduce((groups, row) => {
-      const why = row.boards[board].detail;
+      const why = entryFor(row).detail;
       return groups.set(why, [...(groups.get(why) ?? []), row.name]);
     }, new Map<string, string[]>()),
   ];
@@ -114,12 +129,36 @@ export default function Leaderboard({
   const me = rows.find((row) => row.isMe);
   const leader = scored[0];
   const gap =
-    board === "overall" && me && leader && me.id !== leader.id
+    !isDay && board === "overall" && me && leader && me.id !== leader.id
       ? leader.standing.points - me.standing.points
       : 0;
 
   return (
     <div className="card p-4">
+      <div className="mb-3 flex gap-1 rounded-xl bg-surface-2 p-1">
+        {(
+          [
+            ["day", dayLabel],
+            ["week", "This week"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => {
+              setPeriod(value);
+              setExplaining(null);
+              setOpen(null);
+            }}
+            aria-pressed={period === value}
+            className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
+              period === value ? "bg-surface text-text shadow-sm" : "text-muted"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="mb-4 grid grid-cols-5 gap-1 rounded-xl bg-surface-2 p-1">
         {BOARDS.map((option) => (
           <button
@@ -138,7 +177,7 @@ export default function Leaderboard({
         ))}
       </div>
 
-      {roast && board === "overall" && (
+      {roast && !isDay && board === "overall" && (
         <p className="mb-4 text-center text-xs text-muted italic">
           {roast.verdict}
         </p>
@@ -146,8 +185,8 @@ export default function Leaderboard({
 
       <ol className="space-y-3">
         {scored.map((row, i) => {
-          const entry = row.boards[board];
-          const expandable = board === "overall";
+          const entry = entryFor(row);
+          const expandable = !isDay && board === "overall";
           const expanded = open === row.id && expandable;
 
           return (
@@ -184,7 +223,7 @@ export default function Leaderboard({
                     {row.name}
                     {row.isMe && <span className="text-muted"> (you)</span>}
                   </span>
-                  {board === "overall" && row.standing.streak > 0 && (
+                  {!isDay && board === "overall" && row.standing.streak > 0 && (
                     <span className="nums shrink-0 text-xs text-warn">
                       🔥{row.standing.streak}
                     </span>
@@ -233,7 +272,7 @@ export default function Leaderboard({
                     : entry.detail}
                 </p>
 
-                {board === "overall" && quips.has(row.name) && (
+                {!isDay && board === "overall" && quips.has(row.name) && (
                   <p className="mt-0.5 ml-7 text-xs text-text italic">
                     {quips.get(row.name)}
                   </p>
@@ -310,7 +349,7 @@ export default function Leaderboard({
             {leader.name}.{" "}
           </>
         )}
-        {current.note}
+        {isDay ? (current.dayNote ?? current.note) : current.note}
       </p>
     </div>
   );
