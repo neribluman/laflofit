@@ -29,6 +29,7 @@ export default function NaturalLog({
   const [text, setText] = useState("");
   const [result, setResult] = useState<ReadResult | null>(null);
   const [applied, setApplied] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [reading, startReading] = useTransition();
   const [applying, startApplying] = useTransition();
   const [photo, setPhoto] = useState<string | null>(null);
@@ -48,7 +49,12 @@ export default function NaturalLog({
     startReading(async () => {
       setApplied(false);
       setPhoto(null);
-      setResult(await readDay(date, text));
+      setFailed(null);
+      try {
+        setResult(await readDay(date, text));
+      } catch {
+        setFailed("That didn't get through — your text is still here, try again.");
+      }
     });
 
   const readPhoto = (file: File | undefined) => {
@@ -68,8 +74,14 @@ export default function NaturalLog({
 
   const apply = (report: DayReport) =>
     startApplying(async () => {
-      await applyDay(date, report);
+      try {
+        await applyDay(date, report);
+      } catch {
+        setFailed("That didn't save. Nothing was lost — press Log this again.");
+        return;
+      }
       setApplied(true);
+      setFailed(null);
       setResult(null);
       setText("");
       setPhoto(null);
@@ -111,6 +123,11 @@ export default function NaturalLog({
         </div>
 
         <div className="mt-4 border-t border-line pt-4">
+          {failed && (
+            <p aria-live="polite" className="mb-3 text-sm text-bad">
+              {failed}
+            </p>
+          )}
           <p className="label mb-0">Here&apos;s what I got</p>
           <p className="mt-0.5 mb-3 text-xs text-muted">
             Check it over — nothing is saved until you log it.
@@ -225,8 +242,10 @@ export default function NaturalLog({
         </p>
       )}
 
-      {result && !result.ok && (
-        <p className="mt-3 text-sm text-bad">{result.error}</p>
+      {(failed || (result && !result.ok)) && (
+        <p aria-live="polite" className="mt-3 text-sm text-bad">
+          {failed ?? (result && !result.ok ? result.error : null)}
+        </p>
       )}
 
     </div>
