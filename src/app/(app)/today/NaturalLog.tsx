@@ -132,6 +132,14 @@ export default function NaturalLog({
           if (saved) setSaved(null);
           if (undone) setUndone(false);
         }}
+        onKeyDown={(e) => {
+          // Enter alone has to stay a newline — people write several lines in
+          // here. Cmd/Ctrl+Enter is the send that every message box has.
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (!working && text.trim().length >= 3) log();
+          }
+        }}
         rows={prominent ? 6 : 3}
         maxLength={2000}
         placeholder={EXAMPLE}
@@ -140,7 +148,7 @@ export default function NaturalLog({
 
       {working && (
         <div className="mt-3 space-y-2" aria-live="polite">
-          <p className="text-sm text-muted">Reading it and logging it…</p>
+          <p className="text-sm text-muted">Reading it and adding it…</p>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -157,7 +165,7 @@ export default function NaturalLog({
           disabled={working || text.trim().length < 3}
           className="btn-primary flex-1"
         >
-          {working ? "Logging…" : "Log my day"}
+          {working ? "Adding…" : "Add to my day"}
         </button>
         <label
           aria-label="Photograph your plate"
@@ -184,7 +192,15 @@ export default function NaturalLog({
 
       <p className="mt-2 text-center text-xs text-muted">
         Food, training, weight, how it went — all of it, in one go. Or
-        photograph your plate.
+        photograph your plate.{" "}
+        <span className="whitespace-nowrap">
+          <kbd className="rounded border border-line px-1 py-px text-[10px]">⌘</kbd>
+          <span aria-hidden>/</span>
+          <kbd className="rounded border border-line px-1 py-px text-[10px]">Ctrl</kbd>
+          {" + "}
+          <kbd className="rounded border border-line px-1 py-px text-[10px]">↵</kbd>{" "}
+          adds it.
+        </span>
       </p>
 
       {fallbackHref && !saved && (
