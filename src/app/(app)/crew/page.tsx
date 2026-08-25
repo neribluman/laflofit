@@ -180,25 +180,11 @@ export default async function CrewPage({
   const loggedTodayCount = rows.filter((row) => row.standing.loggedToday).length;
 
 
-  // ---- One day at a time, with that day's winner on top ------------------
-  const dayMeals = await mealsBetween(ids, day, day);
-
+  // ---- The selected day, summarised under the strip ----------------------
   const dayRows = roster
     .map((member) => {
       const score = scoreIndex.get(`${member.id}|${day}`) ?? null;
-      const theirMeals = dayMeals.filter((meal) => meal.user_id === member.id);
-      const theirWorkouts = workouts.filter(
-        (w) => w.user_id === member.id && w.workout_date === day,
-      );
-      const calories = theirMeals.reduce((sum, meal) => sum + (meal.calories ?? 0), 0);
-
-      return {
-        member,
-        score,
-        percent: score ? Math.round(score.ratio * 100) : null,
-        calories: theirMeals.length > 0 ? calories : null,
-        workouts: theirWorkouts,
-      };
+      return { member, percent: score ? Math.round(score.ratio * 100) : null };
     })
     // Logged first, best first. Everyone who sat the day out falls to the end.
     .sort((a, b) => (b.percent ?? -1) - (a.percent ?? -1));
@@ -206,26 +192,26 @@ export default async function CrewPage({
   // Whoever comes first among the people who logged. Turning up on a day
   // nobody else did is the win — the score is a separate argument.
   const winner = dayRows[0]?.percent != null ? dayRows[0] : null;
-
-  // Identical days share a place. Two people on nothing are not 5th and 6th.
-  const dayRanks = dayRows.map((row, i, all) => {
-    const first = all.findIndex((other) => other.percent === row.percent);
-    return first + 1;
-  });
   const dayLoggedCount = dayRows.filter((row) => row.percent != null).length;
 
   const stripDays: StripDay[] = lastNDays(today, 35).map((date) => {
-    const scores = roster
-      .map((member) => scoreIndex.get(`${member.id}|${date}`))
-      .filter((score): score is NonNullable<typeof score> => Boolean(score));
+    const scored = roster
+      .map((member) => ({ member, score: scoreIndex.get(`${member.id}|${date}`) }))
+      .filter((row) => Boolean(row.score))
+      .sort((a, b) => b.score!.ratio - a.score!.ratio);
+
+    const best = scored[0];
     return {
       date,
-      logged: scores.length > 0,
+      logged: scored.length > 0,
       // The crew's day, not one person's: the average of everyone who logged.
-      ratio: scores.length
-        ? scores.reduce((sum, score) => sum + score.ratio, 0) / scores.length
+      ratio: scored.length
+        ? scored.reduce((sum, row) => sum + row.score!.ratio, 0) / scored.length
         : 0,
-      perfect: scores.length > 0 && scores.every((score) => score.perfect),
+      perfect: scored.length > 0 && scored.every((row) => row.score!.perfect),
+      winner: best
+        ? { user: best.member, percent: Math.round(best.score!.ratio * 100) }
+        : undefined,
     };
   });
 
@@ -328,6 +314,28 @@ export default async function CrewPage({
         </p>
       </header>
 
+      <section>
+        <h2 className="label">Day by day</h2>
+        <DayStrip
+          days={stripDays}
+          selected={day}
+          today={today}
+          hrefBase="/crew"
+          earliest={monthAgo}
+          note={
+            dayLoggedCount === 0
+              ? `${prettyDate(day, today)} — nobody logged.`
+              : `${prettyDate(day, today)} — ${
+                  winner ? `won by ${winner.member.display_name} on ${winner.percent}` : "logged"
+                } · ${dayLoggedCount} of ${roster.length} logged · crew average ${Math.round(
+                  dayRows
+                    .filter((row) => row.percent != null)
+                    .reduce((sum, row) => sum + row.percent!, 0) / dayLoggedCount,
+                )}`
+          }
+        />
+      </section>
+
       {!loggedToday && (
         <Link
           href="/today"
@@ -388,98 +396,6 @@ export default async function CrewPage({
       <section>
         <h2 className="label">This week</h2>
         <Leaderboard rows={rows} roastable={canInterpret()} />
-      </section>
-
-      <section>
-        <h2 className="label">Day by day</h2>
-        <div className="space-y-3">
-          <DayStrip
-            days={stripDays}
-            selected={day}
-            today={today}
-            hrefBase="/crew"
-            earliest={monthAgo}
-            note={
-              dayLoggedCount === 0
-                ? "Nobody logged this day."
-                : `${dayLoggedCount} of ${roster.length} logged · crew average ${Math.round(
-                    (dayRows
-                      .filter((row) => row.percent != null)
-                      .reduce((sum, row) => sum + row.percent!, 0) /
-                      dayLoggedCount),
-                  )}`
-            }
-          />
-
-          <div className="card p-4">
-            <p className="mb-3 flex items-baseline gap-2">
-              <span className="text-sm font-semibold">
-                {prettyDate(day, today)}
-              </span>
-              {winner && (
-                <span className="text-xs text-muted">
-                  won by {winner.member.display_name}
-                </span>
-              )}
-            </p>
-
-            {dayLoggedCount === 0 ? (
-              <p className="text-sm text-muted">
-                Nothing logged by anyone on this day.
-              </p>
-            ) : (
-              <ol className="space-y-3">
-                {dayRows.map((row, i) => {
-                  const out = row.percent == null;
-                  return (
-                    <li key={row.member.id} className="flex items-baseline gap-2">
-                      <span className="w-5 shrink-0 text-center">
-                        {out ? (
-                          <span className="text-xs text-muted">·</span>
-                        ) : dayRanks[i] === 1 ? (
-                          "🥇"
-                        ) : (
-                          <span className="nums text-xs text-muted">{dayRanks[i]}</span>
-                        )}
-                      </span>
-                      <Avatar user={row.member} />
-                      <span
-                        className={`min-w-0 flex-1 truncate text-sm ${
-                          i === 0 && !out ? "font-semibold" : ""
-                        } ${out ? "text-muted" : ""}`}
-                      >
-                        {row.member.display_name}
-                        {row.member.id === user.id && (
-                          <span className="text-muted"> (you)</span>
-                        )}
-                        <span className="block text-xs text-muted">
-                          {out
-                            ? "didn't log"
-                            : [
-                                row.calories != null
-                                  ? `${row.calories.toLocaleString()} kcal`
-                                  : null,
-                                ...row.workouts.map(
-                                  (w) =>
-                                    `${w.kind}${w.minutes ? ` ${w.minutes} min` : ""}`,
-                                ),
-                              ]
-                                .filter(Boolean)
-                                .join(" · ") || "logged, nothing else recorded"}
-                        </span>
-                      </span>
-                      <span
-                        className={`nums shrink-0 font-bold ${out ? "text-muted" : ""}`}
-                      >
-                        {out ? "—" : row.percent}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </div>
-        </div>
       </section>
 
       {movement.length > 0 && (

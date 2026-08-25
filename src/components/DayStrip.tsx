@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { addDays, weekdayLetter } from "@/lib/dates";
+import Avatar from "./Avatar";
+import type { User } from "@/lib/types";
 
 export type StripDay = {
   date: string;
   ratio: number;
   logged: boolean;
   perfect: boolean;
+  /** Who took that day, on the crew strip. Absent on a single-person strip. */
+  winner?: {
+    user: Pick<User, "id" | "emoji" | "display_name"> & { has_avatar?: boolean };
+    percent: number;
+  };
 };
 
 export type PeriodTotals = {
@@ -47,7 +54,7 @@ export default function DayStrip({
 
   return (
     <div className="card p-3">
-      <ol className="flex gap-1">
+      <ol className="flex gap-1 pb-1">
         {window.map((date) => {
           const day = byDate.get(date);
           const isSelected = date === selected;
@@ -63,7 +70,11 @@ export default function DayStrip({
                 aria-disabled={future}
                 aria-current={isSelected ? "date" : undefined}
                 aria-label={`${date}: ${
-                  day?.logged ? `${Math.round(day.ratio * 100)} percent` : "not logged"
+                  day?.winner
+                    ? `won by ${day.winner.user.display_name} on ${day.winner.percent}`
+                    : day?.logged
+                      ? `${Math.round(day.ratio * 100)} percent`
+                      : "not logged"
                 }`}
                 className={`flex flex-col items-center gap-1 rounded-xl py-1.5 transition ${
                   future ? "pointer-events-none opacity-30" : "hover:bg-surface-2"
@@ -76,6 +87,32 @@ export default function DayStrip({
                 >
                   {weekdayLetter(date)}
                 </span>
+                {day?.winner ? (
+                  // The face of whoever took the day, with their score on it.
+                  // A row of numbers tells you the shape of the week; a row of
+                  // faces tells you who has been showing up.
+                  <span className="relative flex h-8 w-8 items-center justify-center">
+                    <span
+                      className="flex h-8 w-8 items-center justify-center rounded-full p-[2px]"
+                      style={{
+                        background: `color-mix(in srgb, var(--series) ${Math.round(
+                          25 + day.ratio * 75,
+                        )}%, transparent)`,
+                      }}
+                    >
+                      <Avatar user={day.winner.user} />
+                    </span>
+                    <span
+                      className="nums absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-[3px] text-[9px] font-bold ring-1 ring-surface"
+                      style={{
+                        background: "var(--series)",
+                        color: "var(--accent-ink)",
+                      }}
+                    >
+                      {day.winner.percent}
+                    </span>
+                  </span>
+                ) : (
                 <span
                   className="nums flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold"
                   style={{
@@ -93,6 +130,7 @@ export default function DayStrip({
                 >
                   {day?.perfect ? "✓" : day?.logged ? Math.round(day.ratio * 100) : Number(date.slice(-2))}
                 </span>
+                )}
                 {/* A dot only under today, so the day you're on and the day it
                     actually is are never the same signal. */}
                 <span
