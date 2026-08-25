@@ -248,7 +248,7 @@ export default function Leaderboard({
                 </div>
 
                 <p className="nums mt-1 ml-7 text-xs text-muted">
-                  {board === "overall"
+                  {!isDay && board === "overall"
                     ? row.standing.daysLogged === 0
                       ? row.daysInCrew <= 1
                         ? "joined today · nothing logged yet"

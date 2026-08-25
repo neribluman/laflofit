@@ -196,7 +196,7 @@ export default async function CrewPage({
         dayBoards: {
           overall: {
             value: dayScore ? Math.round(dayScore.ratio * 100) : -1,
-            display: dayScore ? `${Math.round(dayScore.ratio * 100)}` : "—",
+            display: dayScore ? `${Math.round(dayScore.ratio * 100)}%` : "—",
             detail: dayScore
               ? [
                   theirDayMeals.length
@@ -391,12 +391,12 @@ export default async function CrewPage({
             dayLoggedCount === 0
               ? `${prettyDate(day, today)} — nobody logged.`
               : `${prettyDate(day, today)} — ${
-                  winner ? `won by ${winner.member.display_name} on ${winner.percent}` : "logged"
+                  winner ? `won by ${winner.member.display_name} on ${winner.percent}%` : "logged"
                 } · ${dayLoggedCount} of ${roster.length} logged · crew average ${Math.round(
                   dayRows
                     .filter((row) => row.percent != null)
                     .reduce((sum, row) => sum + row.percent!, 0) / dayLoggedCount,
-                )}`
+                )}%`
           }
         />
       </section>

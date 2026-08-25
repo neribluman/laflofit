@@ -109,7 +109,7 @@ export default function DayStrip({
                         color: "var(--accent-ink)",
                       }}
                     >
-                      {day.winner.percent}
+                      {day.winner.percent}%
                     </span>
                   </span>
                 ) : (
