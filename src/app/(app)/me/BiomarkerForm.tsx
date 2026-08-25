@@ -1,5 +1,6 @@
 import { saveMeasurement } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
+import HeightField from "@/components/HeightField";
 import { lengthUnit, weightUnit } from "@/lib/units";
 import type { Units } from "@/lib/types";
 
@@ -55,21 +56,11 @@ export default function BiomarkerForm({
           />
         </div>
 
-        <div>
-          <label className="label" htmlFor="height">
-            Height ({lengthUnit(units)})
-          </label>
-          <input
-            id="height"
-            name="height"
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            min={0}
-            placeholder={knowsHeight ? "—" : "once is enough"}
-            className="field nums"
-          />
-        </div>
+        <HeightField
+          units={units}
+          currentCm={null}
+          hint={knowsHeight ? "—" : "once is enough"}
+        />
       </div>
 
       <SubmitButton pendingLabel="Saving…">Save entry</SubmitButton>

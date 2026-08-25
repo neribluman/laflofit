@@ -1,7 +1,8 @@
 import { saveProfileFields } from "@/app/(app)/profile-actions";
 import SubmitButton from "@/components/SubmitButton";
+import HeightField from "@/components/HeightField";
 import { ACTIVITY_LEVELS, ageFrom } from "@/lib/profile";
-import { cmToDisplay, kgToDisplay, weightUnit } from "@/lib/units";
+import { kgToDisplay, weightUnit } from "@/lib/units";
 import type { User } from "@/lib/types";
 
 /** The by-hand version. Every field optional. */
@@ -38,23 +39,7 @@ export default function ProfileFields({
             className="field nums"
           />
         </div>
-        <div>
-          <label className="label" htmlFor="height">
-            Height ({units === "imperial" ? "in" : "cm"})
-          </label>
-          <input
-            id="height"
-            name="height"
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            defaultValue={
-              user.height_cm == null ? "" : cmToDisplay(user.height_cm, units).toFixed(1)
-            }
-            placeholder="—"
-            className="field nums"
-          />
-        </div>
+        <HeightField units={units} currentCm={user.height_cm} />
         <div>
           <label className="label" htmlFor="goal_weight">
             Goal ({weightUnit(units)})

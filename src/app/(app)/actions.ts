@@ -6,6 +6,7 @@ import { sql, sqlOne } from "@/lib/db";
 import { currentUser } from "@/lib/data";
 import { endSession } from "@/lib/session";
 import { displayToCm, displayToKg, kgToDisplay, weightUnit } from "@/lib/units";
+import { heightFromForm } from "@/lib/height";
 import type { User } from "@/lib/types";
 
 // There is no row-level security here the way there was on Supabase, so every
@@ -139,12 +140,9 @@ export async function saveMeasurement(formData: FormData) {
   const restingHr = num("resting_hr");
 
   // Height sits on the person, not the entry — save it whenever it's given.
-  const height = num("height");
-  if (height != null && height > 0) {
-    await sql`
-      update users set height_cm = ${displayToCm(height, user.units)}
-      where id = ${user.id}
-    `;
+  const heightCm = heightFromForm(formData, user.units, num("height"));
+  if (heightCm != null && heightCm > 0) {
+    await sql`update users set height_cm = ${heightCm} where id = ${user.id}`;
     revalidatePath("/me");
   }
 

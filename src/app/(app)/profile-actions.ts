@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { currentUser } from "@/lib/data";
-import { displayToCm, displayToKg, feetInchesToCm } from "@/lib/units";
+import { displayToKg, feetInchesToCm } from "@/lib/units";
+import { heightFromForm } from "@/lib/height";
 import type { Units, User } from "@/lib/types";
 
 async function requireUser(): Promise<User> {
@@ -27,6 +28,7 @@ export async function saveProfileFields(formData: FormData) {
   const age = num("age");
   const thisYear = Number(String(formData.get("this_year") ?? "")) || null;
   const height = num("height");
+  const heightCm = heightFromForm(formData, user.units, height);
   const goal = num("goal_weight");
   const sex = String(formData.get("sex") ?? "");
   const activity = String(formData.get("activity_level") ?? "");
@@ -36,7 +38,7 @@ export async function saveProfileFields(formData: FormData) {
     update users set
       birth_year     = ${age && thisYear ? thisYear - Math.round(age) : null},
       sex            = ${["male", "female", "other"].includes(sex) ? sex : null},
-      height_cm      = ${height == null ? null : displayToCm(height, user.units)},
+      height_cm      = ${heightCm},
       goal_weight_kg = ${goal == null ? null : displayToKg(goal, user.units)},
       activity_level = ${["sedentary", "light", "moderate", "very"].includes(activity) ? activity : null},
       about          = ${about || null}
