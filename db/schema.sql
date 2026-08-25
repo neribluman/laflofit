@@ -242,3 +242,19 @@ alter table users add column if not exists about text;
 -- Served through /avatar/[id] so pages reference a URL the browser caches,
 -- rather than carrying the bytes in every render.
 alter table users add column if not exists avatar text;
+
+-- The week's ruling on the crew, written by Claude from the standings.
+--
+-- Cached because it costs an API call and reads the same all day. `digest` is
+-- a fingerprint of the numbers it was written from: when someone logs and the
+-- standings move, the digest changes and the ruling gets rewritten. One row
+-- per crew per day, so yesterday's is overwritten rather than piling up.
+create table if not exists crew_banter (
+  id         uuid primary key default gen_random_uuid(),
+  crew_id    uuid not null references crews (id) on delete cascade,
+  for_date   date not null,
+  digest     text not null,
+  body       jsonb not null,
+  created_at timestamptz not null default now(),
+  unique (crew_id, for_date)
+);

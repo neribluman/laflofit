@@ -30,6 +30,8 @@ import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
 import InviteCode from "./InviteCode";
+import RoastCard from "./RoastCard";
+import { canInterpret } from "@/lib/interpret";
 
 type FeedItem = {
   key: string;
@@ -152,6 +154,7 @@ export default async function CrewPage() {
     .sort((a, b) => b.standing.points - a.standing.points);
 
   const loggedTodayCount = rows.filter((row) => row.standing.loggedToday).length;
+
 
   // ---- Weight movement over 30 days --------------------------------------
   const movement = roster
@@ -313,6 +316,20 @@ export default async function CrewPage() {
         <h2 className="label">This week</h2>
         <Leaderboard rows={rows} />
       </section>
+
+      {canInterpret() && (
+        <section>
+          <h2 className="label">The ruling</h2>
+          <RoastCard
+            faces={rows.map((row) => ({
+              id: row.id,
+              name: row.name,
+              emoji: row.emoji,
+              hasAvatar: row.hasAvatar,
+            }))}
+          />
+        </section>
+      )}
 
       {movement.length > 0 && (
         <section>
