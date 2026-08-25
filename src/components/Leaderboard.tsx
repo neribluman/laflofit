@@ -208,7 +208,12 @@ export default function Leaderboard({
                             ? ` · ${row.standing.perfectDays} perfect`
                             : ""
                         }${row.standing.loggedToday ? "" : " · not today"}${
-                          row.daysInCrew < 7
+                          // Only when it explains something. Logging more days
+                          // than you have been a member — imported history, a
+                          // rejoin — makes "joined 2 days ago" read as a
+                          // contradiction sitting next to "5 days logged".
+                          row.daysInCrew < 7 &&
+                          row.standing.daysLogged <= row.daysInCrew
                             ? row.daysInCrew <= 1
                               ? " · joined today"
                               : ` · joined ${row.daysInCrew} days ago`
