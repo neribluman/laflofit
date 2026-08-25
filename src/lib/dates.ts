@@ -97,3 +97,31 @@ export function addMonths(isoMonth: string, n: number): string {
   const dt = new Date(Date.UTC(y, m - 1 + n, 1));
   return dt.toISOString().slice(0, 7);
 }
+
+/**
+ * The clock time of a timestamp, as the reader's own clock showed it.
+ *
+ * Everything is stored UTC, and the crew is not all in one place — rendering
+ * a raw timestamp would show Gidi's evening as somebody else's afternoon.
+ */
+export function timeOfDay(iso: string, timezone: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: timezone,
+  }).format(at);
+}
+
+/** The calendar day a timestamp fell on, in that timezone. */
+export function dateIn(iso: string, timezone: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: timezone,
+  }).format(at);
+}

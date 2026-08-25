@@ -55,6 +55,8 @@ export type DayLog = {
   log_date: string;
   plan_id: string | null;
   note: string | null;
+  /** When it was written, ISO with a Z. The day it is *about* is log_date. */
+  created_at: string;
 };
 
 export type RuleEntry = {
@@ -72,6 +74,8 @@ export type Workout = {
   minutes: number | null;
   intensity: "easy" | "moderate" | "hard";
   notes: string | null;
+  /** When it was written, ISO with a Z. The day it is *about* is workout_date. */
+  created_at: string;
 };
 
 export type Measurement = {

@@ -13,7 +13,7 @@ import {
   rulesForPlans,
   workoutsBetween,
 } from "@/lib/data";
-import { addDays, daysBetween, prettyDate, todayIn } from "@/lib/dates";
+import { addDays, dateIn, daysBetween, prettyDate, timeOfDay, todayIn } from "@/lib/dates";
 import { lastNDays } from "@/lib/dates";
 import { scoreDay, standingFor } from "@/lib/scoring";
 import { kgToDisplay, weightUnit } from "@/lib/units";
@@ -39,6 +39,8 @@ type FeedItem = {
   id: string;
   userId: string;
   date: string;
+  /** When it was written. The day it is about is `date` — often not the same. */
+  at: string;
   headline: string;
   detail?: string;
 };
@@ -261,6 +263,7 @@ export default async function CrewPage({
           id: log.id,
           userId: log.user_id,
           date: log.log_date,
+          at: log.created_at,
           headline: score.perfect
             ? "nailed a perfect day"
             : `hit ${Math.round(score.ratio * 100)}% of the plan`,
@@ -275,13 +278,21 @@ export default async function CrewPage({
         id: workout.id,
         userId: workout.user_id,
         date: workout.workout_date,
+        at: workout.created_at,
         headline: `trained — ${workout.kind}${
           workout.minutes ? `, ${workout.minutes} min` : ""
         }`,
         detail: workout.notes ?? undefined,
       })),
   ]
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    // The day it happened first, then the order it was written within that day.
+    .sort((a, b) =>
+      a.date === b.date
+        ? b.at.localeCompare(a.at)
+        : a.date < b.date
+          ? 1
+          : -1,
+    )
     .slice(0, 40);
 
   const targetIds = feed.map((item) => item.id);
@@ -446,8 +457,24 @@ export default async function CrewPage({
                       </span>{" "}
                       <span className="text-muted">{item.headline}</span>
                     </p>
-                    <span className="shrink-0 text-xs text-muted">
-                      {prettyDate(item.date, today)}
+                    <span className="shrink-0 text-right text-xs text-muted">
+                      {(() => {
+                        const clock = timeOfDay(item.at, user.timezone);
+                        const writtenOn = dateIn(item.at, user.timezone);
+                        // A day logged after the fact would otherwise read as
+                        // having happened at the moment it was typed up.
+                        if (writtenOn && writtenOn !== item.date) {
+                          return (
+                            <>
+                              {prettyDate(item.date, today)}
+                              <span className="block text-[10px]">
+                                added {prettyDate(writtenOn, today).toLowerCase()} {clock}
+                              </span>
+                            </>
+                          );
+                        }
+                        return `${prettyDate(item.date, today)} ${clock}`;
+                      })()}
                     </span>
                   </div>
 

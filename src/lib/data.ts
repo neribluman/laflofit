@@ -99,7 +99,9 @@ export async function dayLogsBetween(
 ): Promise<DayLog[]> {
   if (userIds.length === 0) return [];
   return sql<DayLog>`
-    select id, user_id, log_date::text as log_date, plan_id, note
+    select id, user_id, log_date::text as log_date, plan_id, note,
+           to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+             as created_at
     from day_logs
     where user_id = any(${userIds}::uuid[])
       and log_date between ${from}::date and ${to}::date
@@ -124,7 +126,9 @@ export async function workoutsBetween(
   if (userIds.length === 0) return [];
   return sql<Workout>`
     select id, user_id, workout_date::text as workout_date, kind, minutes,
-           intensity, notes
+           intensity, notes,
+           to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+             as created_at
     from workouts
     where user_id = any(${userIds}::uuid[])
       and workout_date between ${from}::date and ${to}::date
