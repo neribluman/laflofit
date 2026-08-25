@@ -116,8 +116,11 @@ export default async function CrewPage({
     );
   }
 
-  // ---- Leaderboard: last 7 days ------------------------------------------
+  // ---- Leaderboard: last 7 days, and the one selected day ----------------
   const week = lastNDays(today, 7);
+
+  // Read by the rows below, so it has to be fetched before them.
+  const dayMeals = await mealsBetween(ids, day, day);
 
   const rows: LeaderRow[] = roster
     .map((member) => {
@@ -232,8 +235,6 @@ export default async function CrewPage({
 
   const loggedTodayCount = rows.filter((row) => row.standing.loggedToday).length;
 
-
-  const dayMeals = await mealsBetween(ids, day, day);
 
   // ---- The selected day, summarised under the strip ----------------------
   const dayRows = roster
