@@ -9,7 +9,7 @@ import {
   rulesForPlans,
   workoutsBetween,
 } from "./data";
-import { addDays, lastNDays } from "./dates";
+import { addDays, daysBetween, lastNDays } from "./dates";
 import { scoreDay, standingFor } from "./scoring";
 import { calorieBoard, proteinBoard, strengthBoard } from "./boards";
 import { exercisesForWorkouts } from "./data";
@@ -115,9 +115,13 @@ export async function roastInput(
       (m) => m.user_id === member.id && m.weight_kg != null && m.measured_on >= monthAgo,
     );
 
+    // created_at is a timestamp; the calendar day is what a week is counted in.
+    const joinedOn = member.created_at.slice(0, 10);
+
     return {
       name: member.display_name,
       isLeader: false,
+      daysInCrew: Math.max(1, daysBetween(joinedOn, today) + 1),
       points: standing.points,
       daysLogged: standing.daysLogged,
       average: standing.average,

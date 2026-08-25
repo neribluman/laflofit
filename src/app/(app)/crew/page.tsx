@@ -138,8 +138,11 @@ export default async function CrewPage() {
         standing,
         boards: {
           overall: {
+            // Seven days at up to 100 each, so the raw total tops out at 700 —
+            // a denominator nobody can see and therefore nobody can read. Shown
+            // as the share of a perfect week instead; the ranking is identical.
             value: standing.points,
-            display: String(standing.points),
+            display: `${Math.round(standing.points / 7)}%`,
             detail: "",
             missing: false,
           },

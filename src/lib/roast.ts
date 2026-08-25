@@ -28,6 +28,8 @@ export type Roast = z.infer<typeof Roast>;
 export type RoastMember = {
   name: string;
   isLeader: boolean;
+  /** 1 on the day they joined. Nobody is answerable for days before this. */
+  daysInCrew: number;
   daysLogged: number;
   average: number;
   streak: number;
@@ -69,7 +71,21 @@ RULES
 - One real number, or one image drawn from a real number. Never both, never two
   clauses joined by "and" — that is two jokes fighting.
 - Nobody escapes, the leader least of all. Winning is its own character flaw.
-- Hardest on whoever logged nothing.
+- Hardest on whoever logged nothing — but only when they have had the time not
+  to. See NEW ARRIVALS.
+- Never cite a number the data does not contain. An invented figure is not a
+  joke that went slightly wrong, it is a lie about your friend.
+
+NEW ARRIVALS
+Some of them joined days or hours ago. The scoreboard says how long each has
+been here, and it is the only denominator that counts: someone who joined this
+morning has an empty week because they were not in the crew for it, and telling
+them they wasted seven days is simply false. Never hold days against a person
+that predate them.
+
+For anyone in their first day or two, the joke is the arrival itself — the
+optimism, the clean record, what everyone else looked like once, how long the
+enthusiasm is expected to last. It should still bite. It just has to be true.
 - No exclamation marks. No "oy vey", no "mazel tov", no phonetic accent, no
   Yiddish sprinkled in as seasoning — the rhythm carries it, not props.
 
@@ -91,9 +107,26 @@ Jewish people. If a joke would land the same coming from a stranger, cut it.`;
 function scoreboard(members: RoastMember[]): string {
   return members
     .map((m) => {
+      // The denominator first: everything below it is only fair in its light.
+      // History can predate the account — someone re-joining, or back-filling
+      // an old diary — so never claim fewer days than they actually logged.
+      const backfilled = m.daysLogged > m.daysInCrew;
+      const available = Math.min(7, Math.max(m.daysInCrew, m.daysLogged));
+
+      const here = backfilled
+        ? `  in the crew ${m.daysInCrew} day${m.daysInCrew === 1 ? "" : "s"}, with older days back-filled from before that`
+        : m.daysInCrew <= 1
+          ? "  JOINED TODAY — has not had a week to waste"
+          : m.daysInCrew < 7
+            ? `  JOINED ${m.daysInCrew} DAYS AGO — only ${m.daysInCrew} of these 7 days were theirs`
+            : `  in the crew ${m.daysInCrew} days`;
+
       const bits = [
         `${m.name}${m.isLeader ? " (currently top of the overall board)" : ""}`,
-        `  logged ${m.daysLogged} of the last 7 days, averaging ${m.average}/100`,
+        here,
+        `  logged ${m.daysLogged} of the ${available} day${
+          available === 1 ? "" : "s"
+        } available to them, averaging ${m.average}/100`,
         `  trained ${m.daysTrained} day${m.daysTrained === 1 ? "" : "s"}${
           m.sessions.length ? `: ${m.sessions.join(", ")}` : ""
         }`,
@@ -121,7 +154,7 @@ function scoreboard(members: RoastMember[]): string {
  * Bump VOICE whenever the prompt or the output shape changes, or every crew
  * keeps being served whatever was cached under the old one.
  */
-const VOICE = 2;
+const VOICE = 3;
 
 export function digestOf(crewName: string, members: RoastMember[]): string {
   return `v${VOICE}|${crewName}|${scoreboard(members)}`;

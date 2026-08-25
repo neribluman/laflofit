@@ -30,7 +30,7 @@ const BOARDS: { key: BoardKey; tab: string; note: string }[] = [
   {
     key: "overall",
     tab: "Overall",
-    note: "Each logged day is worth up to 100 — how much you get is how much of your plan you hit.",
+    note: "Your share of a perfect week. Each of the seven days is worth up to 100, and how much of that you get is how much of your plan you hit — so a day you never log costs you the whole 100.",
   },
   {
     key: "training",
