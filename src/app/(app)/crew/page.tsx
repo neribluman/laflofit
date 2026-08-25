@@ -30,6 +30,7 @@ import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
 import InviteCode from "./InviteCode";
+import DayStrip, { type StripDay } from "@/components/DayStrip";
 import { canInterpret } from "@/lib/interpret";
 
 type FeedItem = {
@@ -42,7 +43,11 @@ type FeedItem = {
   detail?: string;
 };
 
-export default async function CrewPage() {
+export default async function CrewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ d?: string }>;
+}) {
   const user = await currentUser();
   if (!user) redirect("/login");
 
@@ -51,6 +56,10 @@ export default async function CrewPage() {
 
   const today = todayIn(user.timezone);
   const monthAgo = addDays(today, -29);
+
+  const { d } = await searchParams;
+  const day =
+    d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today && d >= monthAgo ? d : today;
 
   const roster = await crewRoster(crew.id);
   const ids = roster.map((member) => member.id);
@@ -92,6 +101,19 @@ export default async function CrewPage() {
     ]);
   }
 
+  // ---- One score per person per day, built once --------------------------
+  const scoreIndex = new Map<string, ReturnType<typeof scoreDay>>();
+  for (const log of logs) {
+    const rules =
+      rulesByPlan.get(
+        log.plan_id ?? roster.find((m) => m.id === log.user_id)?.active_plan_id ?? "",
+      ) ?? [];
+    scoreIndex.set(
+      `${log.user_id}|${log.log_date}`,
+      scoreDay(rules, entriesByLog.get(log.id) ?? [], true),
+    );
+  }
+
   // ---- Leaderboard: last 7 days ------------------------------------------
   const week = lastNDays(today, 7);
 
@@ -100,14 +122,7 @@ export default async function CrewPage() {
       const scoreByDate = new Map(
         logs
           .filter((log) => log.user_id === member.id)
-          .map((log) => [
-            log.log_date,
-            scoreDay(
-              rulesByPlan.get(log.plan_id ?? member.active_plan_id ?? "") ?? [],
-              entriesByLog.get(log.id) ?? [],
-              true,
-            ),
-          ]),
+          .map((log) => [log.log_date, scoreIndex.get(`${member.id}|${log.log_date}`)!]),
       );
 
       // Latest weight on file — every relative board needs it.
@@ -160,6 +175,48 @@ export default async function CrewPage() {
 
   const loggedTodayCount = rows.filter((row) => row.standing.loggedToday).length;
 
+
+  // ---- One day at a time, with that day's winner on top ------------------
+  const dayMeals = await mealsBetween(ids, day, day);
+
+  const dayRows = roster
+    .map((member) => {
+      const score = scoreIndex.get(`${member.id}|${day}`) ?? null;
+      const theirMeals = dayMeals.filter((meal) => meal.user_id === member.id);
+      const theirWorkouts = workouts.filter(
+        (w) => w.user_id === member.id && w.workout_date === day,
+      );
+      const calories = theirMeals.reduce((sum, meal) => sum + (meal.calories ?? 0), 0);
+
+      return {
+        member,
+        score,
+        percent: score ? Math.round(score.ratio * 100) : null,
+        calories: theirMeals.length > 0 ? calories : null,
+        workouts: theirWorkouts,
+      };
+    })
+    // Logged first, best first. Everyone who sat the day out falls to the end.
+    .sort((a, b) => (b.percent ?? -1) - (a.percent ?? -1));
+
+  // Logging a day and scoring nothing on it is not a win, even unopposed.
+  const winner = dayRows[0]?.percent ? dayRows[0] : null;
+  const dayLoggedCount = dayRows.filter((row) => row.percent != null).length;
+
+  const stripDays: StripDay[] = lastNDays(today, 35).map((date) => {
+    const scores = roster
+      .map((member) => scoreIndex.get(`${member.id}|${date}`))
+      .filter((score): score is NonNullable<typeof score> => Boolean(score));
+    return {
+      date,
+      logged: scores.length > 0,
+      // The crew's day, not one person's: the average of everyone who logged.
+      ratio: scores.length
+        ? scores.reduce((sum, score) => sum + score.ratio, 0) / scores.length
+        : 0,
+      perfect: scores.length > 0 && scores.every((score) => score.perfect),
+    };
+  });
 
   // ---- Weight movement over 30 days --------------------------------------
   const movement = roster
@@ -320,6 +377,98 @@ export default async function CrewPage() {
       <section>
         <h2 className="label">This week</h2>
         <Leaderboard rows={rows} roastable={canInterpret()} />
+      </section>
+
+      <section>
+        <h2 className="label">Day by day</h2>
+        <div className="space-y-3">
+          <DayStrip
+            days={stripDays}
+            selected={day}
+            today={today}
+            hrefBase="/crew"
+            earliest={monthAgo}
+            note={
+              dayLoggedCount === 0
+                ? "Nobody logged this day."
+                : `${dayLoggedCount} of ${roster.length} logged · crew average ${Math.round(
+                    (dayRows
+                      .filter((row) => row.percent != null)
+                      .reduce((sum, row) => sum + row.percent!, 0) /
+                      dayLoggedCount),
+                  )}`
+            }
+          />
+
+          <div className="card p-4">
+            <p className="mb-3 flex items-baseline gap-2">
+              <span className="text-sm font-semibold">
+                {prettyDate(day, today)}
+              </span>
+              {winner && (
+                <span className="text-xs text-muted">
+                  won by {winner.member.display_name}
+                </span>
+              )}
+            </p>
+
+            {dayLoggedCount === 0 ? (
+              <p className="text-sm text-muted">
+                Nothing logged by anyone on this day.
+              </p>
+            ) : (
+              <ol className="space-y-3">
+                {dayRows.map((row, i) => {
+                  const out = row.percent == null;
+                  return (
+                    <li key={row.member.id} className="flex items-baseline gap-2">
+                      <span className="w-5 shrink-0 text-center">
+                        {out ? (
+                          <span className="text-xs text-muted">·</span>
+                        ) : i === 0 && winner ? (
+                          "🥇"
+                        ) : (
+                          <span className="nums text-xs text-muted">{i + 1}</span>
+                        )}
+                      </span>
+                      <Avatar user={row.member} />
+                      <span
+                        className={`min-w-0 flex-1 truncate text-sm ${
+                          i === 0 && !out ? "font-semibold" : ""
+                        } ${out ? "text-muted" : ""}`}
+                      >
+                        {row.member.display_name}
+                        {row.member.id === user.id && (
+                          <span className="text-muted"> (you)</span>
+                        )}
+                        <span className="block text-xs text-muted">
+                          {out
+                            ? "didn't log"
+                            : [
+                                row.calories != null
+                                  ? `${row.calories.toLocaleString()} kcal`
+                                  : null,
+                                ...row.workouts.map(
+                                  (w) =>
+                                    `${w.kind}${w.minutes ? ` ${w.minutes} min` : ""}`,
+                                ),
+                              ]
+                                .filter(Boolean)
+                                .join(" · ") || "logged, nothing else recorded"}
+                        </span>
+                      </span>
+                      <span
+                        className={`nums shrink-0 font-bold ${out ? "text-muted" : ""}`}
+                      >
+                        {out ? "—" : row.percent}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+        </div>
       </section>
 
       {movement.length > 0 && (
