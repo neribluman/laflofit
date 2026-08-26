@@ -26,10 +26,24 @@ export const estimatedOneRep = (weightKg: number, reps: number | null) =>
 
 export type BoardKey =
   | "overall"
+  | "plan"
   | "training"
   | "protein"
   | "calories"
   | "strength";
+
+/** The boards that are actually contests. "overall" is their combination. */
+export const CATEGORIES = ["plan", "training", "protein", "calories", "strength"] as const;
+
+export type CategoryKey = (typeof CATEGORIES)[number];
+
+export const CATEGORY_LABEL: Record<CategoryKey, string> = {
+  plan: "Plan",
+  training: "Training",
+  protein: "Protein",
+  calories: "Calories",
+  strength: "Strength",
+};
 
 export type BoardEntry = {
   /** What ranks them. Higher is always better, whatever the board. */
@@ -229,4 +243,134 @@ export function trainingBoard(workouts: Workout[], week: string[]): BoardEntry {
         .join(" · ") + (minutes > 0 ? ` · ${minutes} min` : ""),
     missing: false,
   };
+}
+
+/**
+ * The overall standing: not one score, but how you placed across all of them.
+ *
+ * A single "percentage of plan" was never comparable between people. A plan
+ * with six strict rules and a plan with a calorie target are different exams,
+ * and marking them out of 100 each and comparing the marks is meaningless.
+ * Following your own plan is one contest among several here, and the winner
+ * overall is whoever did well across the most of them.
+ *
+ * Placement points rather than raw values, because grams per kilo and calorie
+ * accuracy do not add up to anything.
+ *
+ * A point for entering, and a point for everyone you finish ahead of. That
+ * scales itself: winning a contest two people entered is worth 2, while third
+ * of five is worth 3 — which is right, because beating four people is a
+ * bigger thing than beating one. A fixed 5-3-2 medal table handed the same
+ * silver to second-of-two as to second-of-five.
+ *
+ * It also means breadth beats a single speciality, which is what "overall"
+ * ought to mean.
+ */
+const ENTERING = 1;
+
+export type CategoryResult = {
+  key: CategoryKey;
+  label: string;
+  /** null when they weren't in this contest at all. */
+  place: number | null;
+  points: number;
+  /** How many people were in it. */
+  field: number;
+  display: string;
+};
+
+export function combineBoards(
+  perMember: Record<CategoryKey, BoardEntry>[],
+): { entry: BoardEntry; results: CategoryResult[] }[] {
+  const results: CategoryResult[][] = perMember.map(() => []);
+
+  for (const key of CATEGORIES) {
+    // A zero is not a placing. Logging nothing and eating nothing are both
+    // "didn't enter", and neither should collect a participation point.
+    const inIt = perMember
+      .map((boards, i) => ({ i, entry: boards[key] }))
+      .filter(({ entry }) => !entry.missing && entry.value > 0);
+
+    const ladder = [...inIt].sort((a, b) => b.entry.value - a.entry.value);
+
+    for (const [i, boards] of perMember.entries()) {
+      const mine = inIt.find((c) => c.i === i);
+      if (!mine) {
+        results[i].push({
+          key,
+          label: CATEGORY_LABEL[key],
+          place: null,
+          points: 0,
+          field: inIt.length,
+          display: boards[key].display,
+        });
+        continue;
+      }
+      // Equal values take the same place, so a tie splits nobody — and a tie
+      // beats nobody either, which is what makes the two consistent.
+      const place =
+        ladder.findIndex((other) => other.entry.value === mine.entry.value) + 1;
+      const beaten = inIt.filter((o) => o.entry.value < mine.entry.value).length;
+      results[i].push({
+        key,
+        label: CATEGORY_LABEL[key],
+        place,
+        points: ENTERING + beaten,
+        field: inIt.length,
+        display: boards[key].display,
+      });
+    }
+  }
+
+  return results.map((mine) => {
+    const total = mine.reduce((sum, r) => sum + r.points, 0);
+    const ranked = [...mine].sort((a, b) => b.points - a.points);
+    const scored = ranked.filter((r) => r.points > 0);
+
+    return {
+      results: mine,
+      entry: {
+        value: total,
+        display: `${total}`,
+        detail:
+          scored.length === 0
+            ? "not in any contest yet"
+            : scored
+                .map((r) =>
+                  // A medal needs a field to have won it in. Second of two is
+                  // last of two, and a silver next to it says otherwise.
+                  r.field >= 3
+                    ? `${placeMark(r.place)} ${r.label}`
+                    : `${r.label} ${ordinal(r.place ?? 0)} of ${r.field}`,
+                )
+                .join(" · "),
+        missing: false,
+        explain: [
+          "Overall is five separate contests added together. In each one you score a point for entering and a point for everyone you finish ahead of — so winning a contest five people entered is worth more than winning one that two did.",
+          "Following your own plan is one of those contests rather than the whole score, because a six-rule plan and a calorie target are different exams and comparing their percentages proved nothing.",
+          mine
+            .map((r) =>
+              r.place == null
+                ? `${r.label} — didn't enter, 0`
+                : `${r.label} — ${ordinal(r.place)} of ${r.field} (${r.display}), ${r.points} point${r.points === 1 ? "" : "s"}`,
+            )
+            .join(" · "),
+          `Total ${total}.`,
+        ].join("\n\n"),
+      },
+    };
+  });
+}
+
+function placeMark(place: number | null): string {
+  if (place === 1) return "🥇";
+  if (place === 2) return "🥈";
+  if (place === 3) return "🥉";
+  return ordinal(place ?? 0);
+}
+
+function ordinal(n: number): string {
+  const rest = n % 100;
+  if (rest >= 11 && rest <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
 }

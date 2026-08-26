@@ -34,6 +34,12 @@ const BOARDS: { key: BoardKey; tab: string; note: string; dayNote?: string }[] =
   {
     key: "overall",
     tab: "Overall",
+    note: "Not one score — how you placed across five contests, added up. Each one gives you a point for entering and a point for everyone you finish ahead of, so winning a contest five people entered counts for more than winning one that two did. Your own plan is one contest among them, because a six-rule plan and a calorie target are different exams and comparing their percentages proved nothing. Tap a row for the full breakdown.",
+    dayNote: "How you placed across five contests on this day, added up: a point for entering each, and a point for everyone you finish ahead of. Tap a row to see which contests you scored in.",
+  },
+  {
+    key: "plan",
+    tab: "Plan",
     note: "Clean days out of seven. Follow a day completely and it counts as one; half-follow it and it counts as half; never log it and it counts as nothing.",
     dayNote: "How much of your plan you kept on this one day, out of 100. Whoever comes first among the people who logged takes it — turning up when nobody else did still counts.",
   },
@@ -129,8 +135,8 @@ export default function Leaderboard({
   const me = rows.find((row) => row.isMe);
   const leader = scored[0];
   const gap =
-    !isDay && board === "overall" && me && leader && me.id !== leader.id
-      ? leader.standing.points - me.standing.points
+    board === "overall" && me && leader && me.id !== leader.id
+      ? entryFor(leader).value - entryFor(me).value
       : 0;
 
   return (
@@ -159,7 +165,7 @@ export default function Leaderboard({
         ))}
       </div>
 
-      <div className="mb-4 grid grid-cols-5 gap-1 rounded-xl bg-surface-2 p-1">
+      <div className="mb-4 grid grid-cols-6 gap-1 rounded-xl bg-surface-2 p-1">
         {BOARDS.map((option) => (
           <button
             key={option.key}
@@ -168,7 +174,7 @@ export default function Leaderboard({
               setExplaining(null);
             }}
             aria-pressed={board === option.key}
-            className={`rounded-lg py-1.5 text-[11px] font-semibold transition ${
+            className={`rounded-lg py-1.5 text-[10px] font-semibold transition ${
               board === option.key ? "bg-accent text-accent-ink" : "text-muted"
             }`}
           >
@@ -186,7 +192,7 @@ export default function Leaderboard({
       <ol className="space-y-3">
         {scored.map((row, i) => {
           const entry = entryFor(row);
-          const expandable = !isDay && board === "overall";
+          const expandable = !isDay && board === "plan";
           const expanded = open === row.id && expandable;
 
           return (
@@ -223,7 +229,7 @@ export default function Leaderboard({
                     {row.name}
                     {row.isMe && <span className="text-muted"> (you)</span>}
                   </span>
-                  {!isDay && board === "overall" && row.standing.streak > 0 && (
+                  {!isDay && board === "plan" && row.standing.streak > 0 && (
                     <span className="nums shrink-0 text-xs text-warn">
                       🔥{row.standing.streak}
                     </span>
@@ -248,7 +254,7 @@ export default function Leaderboard({
                 </div>
 
                 <p className="nums mt-1 ml-7 text-xs text-muted">
-                  {!isDay && board === "overall"
+                  {!isDay && board === "plan"
                     ? row.standing.daysLogged === 0
                       ? row.daysInCrew <= 1
                         ? "joined today · nothing logged yet"
@@ -290,7 +296,7 @@ export default function Leaderboard({
                     {explaining === row.id ? "Hide" : "Where's that from?"}
                   </button>
                   {explaining === row.id && (
-                    <p className="mt-1 rounded-lg bg-surface-2 px-2.5 py-2 text-xs leading-relaxed text-muted">
+                    <p className="mt-1 rounded-lg bg-surface-2 px-2.5 py-2 text-xs leading-relaxed whitespace-pre-line text-muted">
                       {entry.explain}
                     </p>
                   )}
@@ -345,7 +351,7 @@ export default function Leaderboard({
       <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
         {gap > 0 && (
           <>
-            <span className="nums font-semibold text-text">{gap} points</span> behind{" "}
+            <span className="nums font-semibold text-text">{gap} point{gap === 1 ? "" : "s"}</span> behind{" "}
             {leader.name}.{" "}
           </>
         )}

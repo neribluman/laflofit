@@ -21,9 +21,13 @@ import type { PlanRule } from "@/lib/types";
 import Leaderboard, { type LeaderRow } from "@/components/Leaderboard";
 import {
   calorieBoard,
+  combineBoards,
   proteinBoard,
   strengthBoard,
   trainingBoard,
+  CATEGORIES,
+  type BoardEntry,
+  type CategoryKey,
 } from "@/lib/boards";
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
@@ -122,7 +126,7 @@ export default async function CrewPage({
   // Read by the rows below, so it has to be fetched before them.
   const dayMeals = await mealsBetween(ids, day, day);
 
-  const rows: LeaderRow[] = roster
+  const scaffold = roster
     .map((member) => {
       const scoreByDate = new Map(
         logs
@@ -173,7 +177,7 @@ export default async function CrewPage({
         daysInCrew: Math.max(1, daysBetween(member.created_at.slice(0, 10), today) + 1),
         standing,
         boards: {
-          overall: {
+          plan: {
             // The score is days multiplied by how much of the plan you kept, so
             // what it counts is clean days: follow the day completely and it is
             // worth one, half-follow it and it is worth half, never log it and
@@ -194,7 +198,7 @@ export default async function CrewPage({
           strength: strengthBoard(theirExercises, weightKg),
         },
         dayBoards: {
-          overall: {
+          plan: {
             value: dayScore ? Math.round(dayScore.ratio * 100) : -1,
             display: dayScore ? `${Math.round(dayScore.ratio * 100)}%` : "—",
             detail: dayScore
@@ -230,8 +234,25 @@ export default async function CrewPage({
           strength: strengthBoard(theirDayExercises, weightKg),
         },
       };
-    })
-    .sort((a, b) => b.standing.points - a.standing.points);
+    });
+
+  // Overall is a second pass on purpose: placing in a contest needs everyone
+  // else's number, which does not exist until the first pass has finished.
+  const pick = (boards: Record<string, BoardEntry>) =>
+    Object.fromEntries(
+      CATEGORIES.map((key) => [key, boards[key]]),
+    ) as Record<CategoryKey, BoardEntry>;
+
+  const weekCombined = combineBoards(scaffold.map((row) => pick(row.boards)));
+  const dayCombined = combineBoards(scaffold.map((row) => pick(row.dayBoards)));
+
+  const rows: LeaderRow[] = scaffold
+    .map((row, i) => ({
+      ...row,
+      boards: { ...row.boards, overall: weekCombined[i].entry },
+      dayBoards: { ...row.dayBoards, overall: dayCombined[i].entry },
+    }))
+    .sort((a, b) => b.boards.overall.value - a.boards.overall.value);
 
   const loggedTodayCount = rows.filter((row) => row.standing.loggedToday).length;
 
