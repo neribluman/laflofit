@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { currentUser } from "@/lib/data";
+import { todayIn } from "@/lib/dates";
 import { displayToKg, feetInchesToCm } from "@/lib/units";
 import { heightFromForm } from "@/lib/height";
 import type { Units, User } from "@/lib/types";
@@ -116,9 +117,13 @@ export async function saveIntake(answers: IntakeAnswers, thisYear: number) {
   `;
 
   if (weight != null) {
+    // Their date, not the database's. current_date is UTC, so anyone
+    // finishing onboarding in the evening west of Greenwich was given a
+    // weigh-in dated tomorrow — invisible on today's log, and a point in the
+    // future on their own weight trend.
     await sql`
       insert into measurements (user_id, measured_on, weight_kg)
-      values (${user.id}, current_date, ${displayToKg(weight, units)})
+      values (${user.id}, ${todayIn(user.timezone)}::date, ${displayToKg(weight, units)})
       on conflict (user_id, measured_on) do update set weight_kg = excluded.weight_kg
     `;
   }
