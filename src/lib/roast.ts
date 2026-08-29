@@ -30,6 +30,9 @@ export type RoastMember = {
   isLeader: boolean;
   /** 1 on the day they joined. Nobody is answerable for days before this. */
   daysInCrew: number;
+  /** Their combined standing across the five contests, and where it came from. */
+  overallPoints: number;
+  standingLine: string;
   daysLogged: number;
   average: number;
   streak: number;
@@ -123,6 +126,7 @@ function scoreboard(members: RoastMember[]): string {
 
       const bits = [
         `${m.name}${m.isLeader ? " (currently top of the overall board)" : ""}`,
+        `  overall ${m.overallPoints} points — ${m.standingLine}`,
         here,
         `  logged ${m.daysLogged} of the ${available} day${
           available === 1 ? "" : "s"

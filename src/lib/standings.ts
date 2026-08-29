@@ -11,7 +11,15 @@ import {
 } from "./data";
 import { addDays, daysBetween, lastNDays } from "./dates";
 import { scoreDay, standingFor } from "./scoring";
-import { calorieBoard, proteinBoard, strengthBoard } from "./boards";
+import {
+  calorieBoard,
+  combineBoards,
+  proteinBoard,
+  strengthBoard,
+  trainingBoard,
+  type BoardEntry,
+  type CategoryKey,
+} from "./boards";
 import { exercisesForWorkouts } from "./data";
 import type { PlanRule } from "./types";
 import type { RoastMember } from "./roast";
@@ -101,6 +109,25 @@ export async function roastInput(
       (exercise) => workoutOwner.get(exercise.workout_id) === member.id,
     );
 
+    const categories: Record<CategoryKey, BoardEntry> = {
+      plan: {
+        value: standing.points,
+        display: `${(standing.points / 100).toFixed(1)}/7`,
+        detail: "",
+        missing: false,
+      },
+      training: trainingBoard(theirWorkouts, week),
+      protein: proteinBoard(theirMeals, weightKg),
+      calories: calorieBoard(
+        theirMeals,
+        member,
+        rulesByPlan.get(member.active_plan_id ?? "") ?? [],
+        weightKg,
+        today,
+      ),
+      strength: strengthBoard(theirExercises, weightKg),
+    };
+
     const protein = proteinBoard(theirMeals, weightKg);
     const calories = calorieBoard(
       theirMeals,
@@ -121,6 +148,9 @@ export async function roastInput(
     return {
       name: member.display_name,
       isLeader: false,
+      categories,
+      overallPoints: 0,
+      standingLine: "",
       daysInCrew: Math.max(1, daysBetween(joinedOn, today) + 1),
       points: standing.points,
       daysLogged: standing.daysLogged,
@@ -142,17 +172,25 @@ export async function roastInput(
     };
   });
 
-  const top = Math.max(...members.map((m) => m.points));
+  // The overall standing is a second pass: placing needs everyone else's
+  // numbers. Same function the crew page ranks with, so the write-up and the
+  // leaderboard can never disagree.
+  const combined = combineBoards(members.map((m) => m.categories));
+  for (const [i, member] of members.entries()) {
+    member.overallPoints = combined[i].entry.value;
+    member.standingLine = combined[i].entry.detail;
+  }
 
-  // Leader first, then down to whoever is going to get it worst.
-  members.sort((a, b) => b.points - a.points);
+  const top = Math.max(...members.map((m) => m.overallPoints));
+  members.sort((a, b) => b.overallPoints - a.overallPoints);
 
   return {
     crewName: crew.name,
     members: members.map((member) => ({
       ...member,
-      isLeader: member.points === top && top > 0,
+      isLeader: member.overallPoints === top && top > 0,
       points: undefined,
+      categories: undefined,
     })),
   };
 }

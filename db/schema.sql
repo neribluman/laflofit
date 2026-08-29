@@ -269,3 +269,17 @@ create table if not exists plan_reviews (
   body       jsonb not null,
   created_at timestamptz not null default now()
 );
+
+-- The weekly write-up for pasting into WhatsApp. Cached like the ruling: one
+-- row per crew per day, keyed on a digest of the standings it was written
+-- from, so pressing the button twice costs one call.
+create table if not exists crew_recaps (
+  id         uuid primary key default gen_random_uuid(),
+  crew_id    uuid not null references crews (id) on delete cascade,
+  for_date   date not null,
+  digest     text not null,
+  body       jsonb not null,
+  message    text not null,
+  created_at timestamptz not null default now(),
+  unique (crew_id, for_date)
+);

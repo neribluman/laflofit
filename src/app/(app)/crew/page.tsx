@@ -35,6 +35,7 @@ import Reactions from "@/components/Reactions";
 import CommentBox from "@/components/CommentBox";
 import InviteCode from "./InviteCode";
 import DayStrip, { type StripDay } from "@/components/DayStrip";
+import WeeklyRecap from "./WeeklyRecap";
 import { canInterpret } from "@/lib/interpret";
 
 type FeedItem = {
@@ -486,6 +487,11 @@ export default async function CrewPage({
           roastable={canInterpret()}
           dayLabel={day === today ? "Today" : prettyDate(day, today)}
         />
+        {canInterpret() && (
+          <div className="mt-3">
+            <WeeklyRecap />
+          </div>
+        )}
       </section>
 
       {movement.length > 0 && (
