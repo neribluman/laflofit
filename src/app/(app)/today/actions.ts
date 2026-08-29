@@ -11,7 +11,7 @@ import {
   type DayReport,
 } from "@/lib/interpret";
 import { describePerson } from "@/lib/profile";
-import { displayToKg, displayToKm } from "@/lib/units";
+import { statedToKg, statedToKm } from "@/lib/units";
 import { WORKOUT_KINDS } from "@/lib/presets";
 import type { PlanRule, User } from "@/lib/types";
 
@@ -277,8 +277,16 @@ async function applyDay(
         values (
           ${session.id}, ${exercise.name.trim().slice(0, 80)},
           ${clamp(exercise.sets, 50)}, ${clamp(exercise.reps, 1000)},
-          ${positive(exercise.weight) == null ? null : displayToKg(exercise.weight!, user.units)},
-          ${positive(exercise.distance) == null ? null : displayToKm(exercise.distance!, user.units)},
+          ${
+            positive(exercise.weight) == null
+              ? null
+              : statedToKg(exercise.weight!, exercise.weight_unit ?? null, user.units)
+          },
+          ${
+            positive(exercise.distance) == null
+              ? null
+              : statedToKm(exercise.distance!, exercise.distance_unit ?? null, user.units)
+          },
           ${clamp(exercise.minutes, 600)},
           ${exercise.notes?.slice(0, 200) ?? null},
           ${i}
@@ -298,7 +306,10 @@ async function applyDay(
     };
     await sql`
       insert into measurements (user_id, measured_on, weight_kg)
-      values (${user.id}, ${date}::date, ${displayToKg(report.weight, user.units)})
+      values (
+        ${user.id}, ${date}::date,
+        ${statedToKg(report.weight, report.weight_unit ?? null, user.units)}
+      )
       on conflict (user_id, measured_on) do update set weight_kg = excluded.weight_kg
     `;
   }

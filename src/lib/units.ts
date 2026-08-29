@@ -1,6 +1,7 @@
 import type { Units } from "./types";
 
 const LB_PER_KG = 2.2046226218;
+const MI_PER_KM = 0.621371192;
 const IN_PER_CM = 0.3937007874;
 
 export function kgToDisplay(kg: number, units: Units): number {
@@ -20,12 +21,34 @@ export const weightUnit = (units: Units) =>
 export const lengthUnit = (units: Units) =>
   units === "imperial" ? "in" : "cm";
 
+/** The unit a number was written in, when we know it. */
+export type StatedWeightUnit = "kg" | "lb" | null;
+export type StatedDistanceUnit = "km" | "mi" | null;
+
+/**
+ * Convert to storage using the unit the person actually wrote, falling back to
+ * their account setting only when they didn't say.
+ *
+ * Free text is where this matters: someone whose account is metric will still
+ * write "155 lbs squat", and reading that as 155 kg turns a 70 kg lift into a
+ * crew record.
+ */
+export function statedToKg(v: number, stated: StatedWeightUnit, units: Units): number {
+  if (stated === "lb") return v / LB_PER_KG;
+  if (stated === "kg") return v;
+  return displayToKg(v, units);
+}
+
+export function statedToKm(v: number, stated: StatedDistanceUnit, units: Units): number {
+  if (stated === "mi") return v / MI_PER_KM;
+  if (stated === "km") return v;
+  return displayToKm(v, units);
+}
+
 export function fmtWeight(kg: number | null, units: Units): string {
   if (kg == null) return "—";
   return `${kgToDisplay(kg, units).toFixed(1)} ${weightUnit(units)}`;
 }
-
-const MI_PER_KM = 0.621371192;
 
 export function kmToDisplay(km: number, units: Units): number {
   return units === "imperial" ? km * MI_PER_KM : km;

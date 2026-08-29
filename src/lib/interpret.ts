@@ -69,11 +69,25 @@ const DayReport = z.object({
             weight: z
               .number()
               .nullable()
-              .describe("load per rep, in the units they used"),
+              .describe(
+                "load per rep, exactly the number they wrote. Do NOT convert it.",
+              ),
+            weight_unit: z
+              .enum(["kg", "lb"])
+              .nullable()
+              .describe(
+                "the unit that number was written in: 'lb' for lb/lbs/pounds, 'kg' for kg/kilos. null only if they gave no unit at all.",
+              ),
             distance: z
               .number()
               .nullable()
-              .describe("distance covered, in the units they used"),
+              .describe("distance covered, exactly as written. Do NOT convert it."),
+            distance_unit: z
+              .enum(["km", "mi"])
+              .nullable()
+              .describe(
+                "the unit that distance was written in. null only if they gave no unit at all.",
+              ),
             minutes: z.number().nullable(),
             notes: z.string().nullable(),
           }),
@@ -84,7 +98,13 @@ const DayReport = z.object({
   weight: z
     .number()
     .nullable()
-    .describe("weight if they mentioned one, in their own units"),
+    .describe("bodyweight if they mentioned one, exactly as written. Do NOT convert it."),
+  weight_unit: z
+    .enum(["kg", "lb"])
+    .nullable()
+    .describe(
+      "the unit that bodyweight was written in. null only if they gave no unit at all.",
+    ),
   summary: z
     .string()
     .describe("one short sentence in their own voice, for the day's note"),
@@ -128,6 +148,19 @@ Capture everything they gave you. There are two separate jobs, and the second do
    - If they just say "went to the gym" with no detail, that is still a workout. Leave exercises empty.
 
    Session length: use what they say. Add up per-exercise times only when those times cover the whole session. If one exercise happens to have a time and the rest do not, that time is NOT the session length — leave minutes null. An hour of lifting logged as "15 min" because the bike was the only timed part is wrong.
+
+   Units: report every number exactly as written and say which unit it was
+   written in. Never convert one yourself — the app does that, exactly, and an
+   arithmetic slip here becomes a fake personal best. Somebody on a metric
+   account will still write "155 lbs", and "bench 185" with no unit at all is
+   normal; leave the unit null in that case and their own setting is used.
+
+   When no unit is given and reading it in their own setting makes the lift
+   implausible for their bodyweight — a 225 kg deadlift from someone who
+   weighs 75 kg, say — still leave the unit null, and say so in unclear:
+   "deadlift 225 — kg or lb?". Do not quietly pick one. 225 is two plates a
+   side to an American and a competition deadlift to everyone else, and only
+   they know which they meant.
 
    Intensity: take their word for it — "felt easy", "brutal", "tough". Default to moderate when they say nothing.
 
