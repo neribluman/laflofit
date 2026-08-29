@@ -128,6 +128,15 @@ export async function roastInput(
       strength: strengthBoard(theirExercises, weightKg),
     };
 
+    // Per logged day, not per day in the week: an average dragged down by
+    // days they never ate on record is not what anyone means by "a day".
+    const kcalByDate = new Map<string, number>();
+    for (const meal of theirMeals) {
+      if (meal.calories == null) continue;
+      kcalByDate.set(meal.meal_date, (kcalByDate.get(meal.meal_date) ?? 0) + meal.calories);
+    }
+    const kcalDays = [...kcalByDate.values()];
+
     const protein = proteinBoard(theirMeals, weightKg);
     const calories = calorieBoard(
       theirMeals,
@@ -162,6 +171,9 @@ export async function roastInput(
         (w) => `${w.kind}${w.minutes ? ` ${w.minutes} min` : ""} (${w.intensity})`,
       ),
       proteinPerKg: protein.missing ? null : protein.value,
+      caloriesPerDay: kcalDays.length
+        ? Math.round(kcalDays.reduce((sum, n) => sum + n, 0) / kcalDays.length)
+        : null,
       calorieScore: calories.missing ? null : calories.value,
       strengthRatio: strength.missing ? null : strength.value,
       weightChangeKg:

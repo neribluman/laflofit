@@ -40,6 +40,8 @@ export type RoastMember = {
   daysTrained: number;
   sessions: string[];
   proteinPerKg: number | null;
+  /** Averaged over the days they logged food. Plain, and needs no key. */
+  caloriesPerDay: number | null;
   calorieScore: number | null;
   strengthRatio: number | null;
   weightChangeKg: number | null;
@@ -78,6 +80,10 @@ RULES
   to. See NEW ARRIVALS.
 - Never cite a number the data does not contain. An invented figure is not a
   joke that went slightly wrong, it is a lie about your friend.
+- Never guess anyone's pronouns. A name does not tell you them, and the
+  scoreboard's "sex" field is not a pronoun either. The lines are short enough
+  to write without pronouns at all — do that. If you genuinely need one, use
+  they/them.
 
 NEW ARRIVALS
 Some of them joined days or hours ago. The scoreboard says how long each has
@@ -137,6 +143,8 @@ function scoreboard(members: RoastMember[]): string {
         m.loggedToday ? "  logged today" : "  has not logged today",
       ];
       if (m.streak > 0) bits.push(`  ${m.streak}-day streak`);
+      if (m.caloriesPerDay != null)
+        bits.push(`  averages ${m.caloriesPerDay} kcal a day`);
       if (m.proteinPerKg != null)
         bits.push(`  protein ${m.proteinPerKg.toFixed(2)} g per kg bodyweight`);
       if (m.calorieScore != null)
@@ -158,7 +166,7 @@ function scoreboard(members: RoastMember[]): string {
  * Bump VOICE whenever the prompt or the output shape changes, or every crew
  * keeps being served whatever was cached under the old one.
  */
-const VOICE = 3;
+const VOICE = 4;
 
 export function digestOf(crewName: string, members: RoastMember[]): string {
   return `v${VOICE}|${crewName}|${scoreboard(members)}`;

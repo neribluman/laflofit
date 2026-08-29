@@ -38,7 +38,7 @@ actually did, short enough that the whole thing still reads on one screen. If
 you have written a clause and then a clause explaining it, delete the second.
 
 The numbers are printed for you on a line above each person — days logged,
-their average, sessions, protein, calorie accuracy. Do not repeat them. Your
+sessions, calories a day, protein per kilo. Do not repeat them. Your
 line says what those numbers MEAN: what they topped, what they earned, what
 changed. "won training outright and never missed a Tuesday" beats "trained
 four days", because the four is already on the screen.
@@ -63,6 +63,14 @@ RULES
   a number that beat everyone, a day they turned up when it was hard. Find it
   even for the person at the bottom.
 - Never invent a figure. If you cite one, it is one you were given.
+- Never guess anyone's pronouns. A name does not tell you them, and the
+  scoreboard's "sex" field is not a pronoun either. The lines are short enough
+  to write without pronouns at all — do that. If you genuinely need one, use
+  they/them.
+- The plan average is a percentage of that person's OWN plan, so it is not
+  comparable between them — a strict six-rule plan and a calorie target are
+  different exams. Use it only about one person on their own ("kept 68% of
+  his own plan"), never to rank two people against each other.
 - Someone who joined this week has not skipped days that predate them. The
   scoreboard says how long each has been here; that is the only denominator.
 - Hardest on whoever logged nothing, and only when they had time not to.
@@ -103,7 +111,7 @@ function scoreboard(members: RoastMember[]): string {
 }
 
 export function digestOf(crewName: string, range: string, members: RoastMember[]): string {
-  return `v3|${crewName}|${range}|${scoreboard(members)}`;
+  return `v5|${crewName}|${range}|${scoreboard(members)}`;
 }
 
 /**
@@ -134,14 +142,20 @@ export function toWhatsApp(
     // The points total is meaningless outside the app, so the headline figure
     // is days logged — a number anyone can read cold in a group chat.
     const available = Math.min(7, Math.max(m.daysInCrew, m.daysLogged));
+    // Every figure here has to mean something to someone reading it cold in a
+    // group chat. The plan average doesn't: it is a percentage of that
+    // person's own plan, so 25 and 68 are not the same exam and printing them
+    // in a column invites exactly the wrong comparison. Days, sessions,
+    // calories and grams need no key.
     const stats = [
       `${m.daysLogged}/${available} days`,
-      m.daysLogged > 0 ? `${m.average} avg` : null,
       m.sessions.length > 0
         ? `${m.sessions.length} session${m.sessions.length === 1 ? "" : "s"}`
         : null,
+      m.caloriesPerDay != null
+        ? `${m.caloriesPerDay.toLocaleString()} kcal a day`
+        : null,
       m.proteinPerKg != null ? `${m.proteinPerKg.toFixed(1)} g/kg protein` : null,
-      m.calorieScore != null ? `${m.calorieScore}/100 calories` : null,
     ]
       .filter(Boolean)
       .slice(0, 4)
@@ -152,10 +166,7 @@ export function toWhatsApp(
 
   const logged = members.reduce((sum, m) => sum + m.daysLogged, 0);
   const sessions = members.reduce((sum, m) => sum + m.sessions.length, 0);
-  const active = members.filter((m) => m.daysLogged > 0);
-  const average = active.length
-    ? Math.round(active.reduce((sum, m) => sum + m.average, 0) / active.length)
-    : 0;
+  const showedUp = members.filter((m) => m.daysLogged > 0).length;
 
   return [
     `*${crewName}* · ${range}`,
@@ -167,7 +178,7 @@ export function toWhatsApp(
     `👏 ${recap.highlight}`,
     `👀 ${recap.callout}`,
     "",
-    `_Between you: ${logged} days logged, ${sessions} sessions, ${average}/100 average._`,
+    `_Between you: ${logged} days logged and ${sessions} sessions, from ${showedUp} of ${members.length}._`,
   ].join("\n");
 }
 
