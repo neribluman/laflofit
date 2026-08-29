@@ -95,7 +95,7 @@ export default function WeeklyRecap() {
             <textarea
               readOnly
               value={message}
-              rows={Math.min(20, message.split("\n").length + 1)}
+              rows={Math.min(30, message.split("\n").length + 1)}
               onFocus={(e) => e.currentTarget.select()}
               className="field w-full resize-none font-mono text-xs leading-relaxed"
             />

@@ -13,7 +13,9 @@ export const Recap = z.object({
       name: z.string().describe("exactly one of the member names given, spelled the same way"),
       note: z
         .string()
-        .describe("what they did, at most 7 words, lower case, no full stop. One real number."),
+        .describe(
+          "what they did WELL this week, at most 14 words, lower case, no full stop. Name the thing they topped or the figure they earned. Everyone has something — find it. A dig is allowed only after the credit.",
+        ),
     }),
   ),
   highlight: z
@@ -30,10 +32,20 @@ const SYSTEM = `You write the weekly write-up for a group of friends tracking
 their diets and training together. It gets pasted straight into their WhatsApp
 group, so it has to survive being read on a phone between other messages.
 
-LENGTH IS THE POINT
-Nobody reads a long one. One line per person, seven words each. If you have
-written a clause and then another clause explaining it, delete the second. The
-whole thing should be readable in about fifteen seconds.
+LENGTH
+One line per person, fourteen words at most. Long enough to say what they
+actually did, short enough that the whole thing still reads on one screen. If
+you have written a clause and then a clause explaining it, delete the second.
+
+The numbers are printed for you on a line above each person — days logged,
+their average, sessions, protein, calorie accuracy. Do not repeat them. Your
+line says what those numbers MEAN: what they topped, what they earned, what
+changed. "won training outright and never missed a Tuesday" beats "trained
+four days", because the four is already on the screen.
+
+The test: if a figure in your line already appears on the line above it,
+rewrite the line. "four days logged, four trained" is the stats line read
+back; it costs a whole sentence and tells them nothing new.
 
 VOICE
 Warm, dry, a bit competitive. The tone of someone reading out the scores at the
@@ -47,7 +59,10 @@ seasoning. Nothing about money, appearance, bodies, or anyone's medical
 situation.
 
 RULES
-- Every line uses a real figure from the data. Never invent one.
+- Credit first. Everyone did something worth naming — a category they topped,
+  a number that beat everyone, a day they turned up when it was hard. Find it
+  even for the person at the bottom.
+- Never invent a figure. If you cite one, it is one you were given.
 - Someone who joined this week has not skipped days that predate them. The
   scoreboard says how long each has been here; that is the only denominator.
 - Hardest on whoever logged nothing, and only when they had time not to.
@@ -88,7 +103,7 @@ function scoreboard(members: RoastMember[]): string {
 }
 
 export function digestOf(crewName: string, range: string, members: RoastMember[]): string {
-  return `v2|${crewName}|${range}|${scoreboard(members)}`;
+  return `v3|${crewName}|${range}|${scoreboard(members)}`;
 }
 
 /**
@@ -102,18 +117,45 @@ export function toWhatsApp(
   recap: Recap,
   crewName: string,
   range: string,
-  points: Map<string, number>,
+  members: RoastMember[],
 ): string {
   const medals = ["🥇", "🥈", "🥉"];
+  const byName = new Map(members.map((m) => [m.name, m]));
+  const scores = recap.lines.map((line) => byName.get(line.name)?.overallPoints ?? 0);
 
-  // Equal scores share a place, so two people on 16 both get gold rather than
-  // one of them being quietly demoted by list order.
-  const scores = recap.lines.map((line) => points.get(line.name) ?? 0);
-  const table = recap.lines.map((line, i) => {
+  const table = recap.lines.flatMap((line, i) => {
+    const m = byName.get(line.name);
+    if (!m) return [];
+    // Equal scores share a place, so two people level both get gold rather
+    // than one being quietly demoted by list order.
     const place = scores.findIndex((value) => value === scores[i]);
     const mark = scores[i] > 0 ? (medals[place] ?? "▫️") : "▫️";
-    return `${mark} *${line.name}* — ${scores[i]} · ${line.note}`;
+
+    // The points total is meaningless outside the app, so the headline figure
+    // is days logged — a number anyone can read cold in a group chat.
+    const available = Math.min(7, Math.max(m.daysInCrew, m.daysLogged));
+    const stats = [
+      `${m.daysLogged}/${available} days`,
+      m.daysLogged > 0 ? `${m.average} avg` : null,
+      m.sessions.length > 0
+        ? `${m.sessions.length} session${m.sessions.length === 1 ? "" : "s"}`
+        : null,
+      m.proteinPerKg != null ? `${m.proteinPerKg.toFixed(1)} g/kg protein` : null,
+      m.calorieScore != null ? `${m.calorieScore}/100 calories` : null,
+    ]
+      .filter(Boolean)
+      .slice(0, 4)
+      .join(" · ");
+
+    return [`${mark} *${line.name}* — ${stats}`, `_${line.note}_`];
   });
+
+  const logged = members.reduce((sum, m) => sum + m.daysLogged, 0);
+  const sessions = members.reduce((sum, m) => sum + m.sessions.length, 0);
+  const active = members.filter((m) => m.daysLogged > 0);
+  const average = active.length
+    ? Math.round(active.reduce((sum, m) => sum + m.average, 0) / active.length)
+    : 0;
 
   return [
     `*${crewName}* · ${range}`,
@@ -124,6 +166,8 @@ export function toWhatsApp(
     "",
     `👏 ${recap.highlight}`,
     `👀 ${recap.callout}`,
+    "",
+    `_Between you: ${logged} days logged, ${sessions} sessions, ${average}/100 average._`,
   ].join("\n");
 }
 

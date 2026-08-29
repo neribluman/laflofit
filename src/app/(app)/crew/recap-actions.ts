@@ -45,12 +45,7 @@ export async function weeklyRecap(): Promise<{ message: string } | null> {
   try {
     const recap = await writeRecap(input.crewName, range, input.members);
     body = recap;
-    message = toWhatsApp(
-      recap,
-      input.crewName,
-      range,
-      new Map(input.members.map((m) => [m.name, m.overallPoints])),
-    );
+    message = toWhatsApp(recap, input.crewName, range, input.members);
   } catch {
     return null;
   }
