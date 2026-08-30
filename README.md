@@ -180,6 +180,34 @@ thread each person has.
 Then open the app, go to **Me → WhatsApp → Connect**, and send the code it
 gives you. Texting `STOP` disconnects a number again.
 
+### If Meta's developer platform is in your way
+
+Every legitimate WhatsApp API runs on Meta's infrastructure — no provider
+avoids that. What they avoid is Meta's *developer platform*: a provider owns
+the Meta relationship and gives you an ordinary API instead.
+
+**Twilio's WhatsApp sandbox needs no Meta account at all**, and is the fastest
+way to have this working:
+
+1. Sign up at twilio.com, then Messaging → Try it out → **Send a WhatsApp
+   message**. It shows a shared number and a join phrase.
+2. Each person sends that phrase to the number once, from the phone they'll
+   use. (A sandbox is limited to people who have joined, and they must re-join
+   after 72 hours of silence — fine for a crew, not for strangers.)
+3. In Vercel, set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+   `TWILIO_WHATSAPP_FROM` (the sandbox number, as `whatsapp:+1...`) and
+   `NEXT_PUBLIC_WHATSAPP_NUMBER` (the same number, digits only). Redeploy.
+4. In the sandbox settings, set **When a message comes in** to
+   `https://your-domain/api/whatsapp/twilio`, method POST.
+
+Set the Twilio variables *or* the Meta ones, not both. Everything past the
+front door — linking, logging, answering, STOP — is the same code either way.
+
+Other providers do the same job with a real number instead of a sandbox:
+360dialog charges a flat monthly fee with no per-message markup, and Gupshup,
+Wati and Respond.io are more business-inbox than API. All of them still put a
+Meta business account behind the scenes; they just do that part for you.
+
 ### What it costs
 
 Replying to someone who messaged you first is free, within a 24-hour window.
