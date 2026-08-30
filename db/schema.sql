@@ -283,3 +283,31 @@ create table if not exists crew_recaps (
   created_at timestamptz not null default now(),
   unique (crew_id, for_date)
 );
+
+-- ---------------------------------------------------------------------------
+-- WhatsApp
+--
+-- A phone number is a far better identity than a display name: it arrives
+-- verified with every message, and it is the thing that stops one person
+-- ending up with four accounts. Nullable, because the app works without it.
+-- ---------------------------------------------------------------------------
+alter table users add column if not exists phone text;
+create unique index if not exists users_phone_idx on users (phone) where phone is not null;
+
+-- Short-lived codes for connecting a number to an account. The app shows one,
+-- the person texts it to the bot, and the bot knows who they are. Single use.
+create table if not exists phone_links (
+  code       text primary key,
+  user_id    uuid not null references users (id) on delete cascade,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists phone_links_user_idx on phone_links (user_id);
+
+-- Message ids Meta has already delivered. It retries anything it does not hear
+-- a prompt 200 from, and a retry would log the same dinner twice.
+create table if not exists whatsapp_seen (
+  message_id text primary key,
+  seen_at    timestamptz not null default now()
+);

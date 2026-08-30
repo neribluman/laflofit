@@ -148,6 +148,48 @@ being careful with.
 
 ---
 
+## Logging over WhatsApp
+
+Optional. When it's set up, everyone gets a number they can text — "3 eggs and
+a 5k run" goes straight into their day, and they can ask it things like "am I
+getting enough protein?" and get an answer from their own figures.
+
+Worth knowing before you start: **WhatsApp's API cannot read or post in group
+chats.** This is one-to-one only. The group stays a group; the bot is a private
+thread each person has.
+
+1. **Create a Meta app.** developers.facebook.com → My Apps → Create App →
+   *Business*. Add the **WhatsApp** product to it.
+2. **Get a number.** The API Setup screen gives you a free test number
+   immediately, which is enough to try this with. A test number can only message
+   up to five recipients that you add by hand — fine for a crew this size, but
+   you'll want a real one eventually.
+3. **Copy four things** into Vercel → Settings → Environment Variables:
+   - `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_TOKEN` from API Setup. Generate a
+     **permanent** token via Business Settings → System Users; the one shown on
+     that page expires in 24 hours.
+   - `WHATSAPP_APP_SECRET` from App Settings → Basic.
+   - `WHATSAPP_VERIFY_TOKEN` — invent any long random string.
+   - `NEXT_PUBLIC_WHATSAPP_NUMBER` — the bot's number, digits only.
+4. **Redeploy**, so the variables are baked in.
+5. **Point the webhook at the app.** WhatsApp → Configuration → Edit:
+   - Callback URL: `https://your-domain/api/whatsapp`
+   - Verify token: the string from step 3
+   - Save, then **Subscribe** to the `messages` field.
+
+Then open the app, go to **Me → WhatsApp → Connect**, and send the code it
+gives you. Texting `STOP` disconnects a number again.
+
+### What it costs
+
+Replying to someone who messaged you first is free, within a 24-hour window.
+Since every conversation here starts with them, the running cost is
+approximately nothing — you pay only for messages the bot starts on its own.
+Meta has changed this pricing more than once, so check the current rates before
+you rely on it.
+
+---
+
 ## Putting it on your own domain
 
 Two ways, and they are not equally fiddly.

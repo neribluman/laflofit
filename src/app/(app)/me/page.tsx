@@ -32,6 +32,8 @@ import BiomarkerForm from "./BiomarkerForm";
 import ProfileFields from "@/components/ProfileFields";
 import BiomarkerGrid from "./BiomarkerGrid";
 import PlanReviewCard from "./PlanReviewCard";
+import WhatsAppCard from "./WhatsAppCard";
+import { sqlOne } from "@/lib/db";
 import { cachedReview } from "./review-actions";
 import { canInterpret } from "@/lib/interpret";
 
@@ -312,6 +314,21 @@ export default async function MePage() {
         <section>
           <h2 className="label">How does this plan look?</h2>
           <PlanReviewCard initial={await cachedReview()} />
+        </section>
+      )}
+
+      {process.env.NEXT_PUBLIC_WHATSAPP_NUMBER && (
+        <section>
+          <h2 className="label">WhatsApp</h2>
+          <WhatsAppCard
+            connected={Boolean(
+              (
+                await sqlOne<{ phone: string | null }>`
+                  select phone from users where id = ${user.id}
+                `
+              )?.phone,
+            )}
+          />
         </section>
       )}
 
