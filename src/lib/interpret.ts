@@ -1,7 +1,6 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { structured, type Task } from "./llm";
 import { WORKOUT_KINDS } from "./presets";
 import type { PlanRule, Units } from "./types";
 import { weightUnit } from "./units";
@@ -182,7 +181,6 @@ export async function interpretDay({
   /** One line about who they are, so portions and effort are judged in scale. */
   person?: string;
 }): Promise<DayReport> {
-  const client = new Anthropic();
 
   const ruleSheet = rules.map((rule) => ({
     id: rule.id,
@@ -193,17 +191,18 @@ export async function interpretDay({
     cadence: rule.cadence,
   }));
 
-  const response = await client.messages.parse({
-    // Overridable: set ANTHROPIC_MODEL=claude-haiku-4-5 for a cheaper, faster read.
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 8000,
+  const { value } = await structured({
+    task: "interpret_day" as Task,
+    schema: DayReport,
+    schemaName: "DayReport",
     system: SYSTEM,
+    maxTokens: 8000,
     // Estimating portions takes a little more thought than plain extraction.
-    output_config: { effort: "medium", format: zodOutputFormat(DayReport) },
-    messages: [
+    effort: "medium",
+    content: [
       {
-        role: "user",
-        content: [
+        type: "text",
+        text: [
           person ? `About them: ${person}\n` : "",
           `Their plan's rules:\n${JSON.stringify(ruleSheet, null, 1)}`,
           alreadyLogged.length
@@ -216,8 +215,7 @@ export async function interpretDay({
     ],
   });
 
-  const parsed = response.parsed_output;
-  if (!parsed) throw new Error("Could not read that. Try rephrasing?");
+  const parsed = value;
 
   // The model can only ever write to rules that exist on this plan.
   const known = new Set(rules.map((rule) => rule.id));
@@ -275,17 +273,18 @@ export async function interpretPlanRequest({
   units: Units;
   person?: string;
 }): Promise<PlanDraft> {
-  const client = new Anthropic();
 
-  const response = await client.messages.parse({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 4000,
+  const { value } = await structured({
+    task: "plan_request" as Task,
+    schema: PlanDraft,
+    schemaName: "PlanDraft",
     system: PLAN_SYSTEM,
-    output_config: { effort: "medium", format: zodOutputFormat(PlanDraft) },
-    messages: [
+    maxTokens: 4000,
+    effort: "medium",
+    content: [
       {
-        role: "user",
-        content: [
+        type: "text",
+        text: [
           person ? `About them: ${person}\n` : "",
           `They measure weight in ${weightUnit(units)}.`,
           `\nWhat they said they want:\n"""\n${text}\n"""`,
@@ -294,9 +293,7 @@ export async function interpretPlanRequest({
     ],
   });
 
-  const parsed = response.parsed_output;
-  if (!parsed) throw new Error("Could not read that. Try rephrasing?");
-  return parsed;
+  return value;
 }
 
 // ---------------------------------------------------------------------------
@@ -325,11 +322,12 @@ export async function interpretPlate({
   units: Units;
   person?: string;
 }): Promise<DayReport> {
-  const client = new Anthropic();
 
-  const match = imageDataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
-  if (!match) throw new Error("That doesn't look like a photo.");
-  const [, mediaType, base64] = match;
+  // Still checked here rather than trusted downstream: the harness only reads
+  // the media type off the front of the string, it doesn't validate the rest.
+  if (!/^data:image\/(jpeg|png|webp);base64,.+$/.test(imageDataUrl)) {
+    throw new Error("That doesn't look like a photo.");
+  }
 
   const ruleSheet = rules.map((rule) => ({
     id: rule.id,
@@ -340,39 +338,28 @@ export async function interpretPlate({
     cadence: rule.cadence,
   }));
 
-  const response = await client.messages.parse({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 8000,
+  const { value } = await structured({
+    task: "interpret_plate" as Task,
+    schema: DayReport,
+    schemaName: "DayReport",
     system: PLATE_SYSTEM,
-    output_config: { effort: "medium", format: zodOutputFormat(DayReport) },
-    messages: [
+    maxTokens: 8000,
+    effort: "medium",
+    content: [
+      { type: "image", dataUrl: imageDataUrl },
       {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: mediaType as "image/jpeg" | "image/png" | "image/webp",
-              data: base64,
-            },
-          },
-          {
-            type: "text",
-            text: [
-              person ? `About them: ${person}\n` : "",
-              `Their plan's rules:\n${JSON.stringify(ruleSheet, null, 1)}`,
-              `\nThey weigh themselves in ${weightUnit(units)}.`,
-              `\nWhat is on this plate?`,
-            ].join("\n"),
-          },
-        ],
+        type: "text",
+        text: [
+          person ? `About them: ${person}\n` : "",
+          `Their plan's rules:\n${JSON.stringify(ruleSheet, null, 1)}`,
+          `\nThey weigh themselves in ${weightUnit(units)}.`,
+          `\nWhat is on this plate?`,
+        ].join("\n"),
       },
     ],
   });
 
-  const parsed = response.parsed_output;
-  if (!parsed) throw new Error("Couldn't read that photo. Try another?");
+  const parsed = value;
 
   const known = new Set(rules.map((rule) => rule.id));
   return {

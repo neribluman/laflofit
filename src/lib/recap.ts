@@ -1,7 +1,6 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { structured } from "./llm";
 import type { RoastMember } from "./roast";
 
 export const Recap = z.object({
@@ -187,28 +186,22 @@ export async function writeRecap(
   range: string,
   members: RoastMember[],
 ): Promise<Recap> {
-  const client = new Anthropic();
-
-  const response = await client.messages.parse({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 2000,
+  const { value } = await structured({
+    task: "recap",
+    schema: Recap,
+    schemaName: "Recap",
     system: SYSTEM,
-    output_config: { effort: "high", format: zodOutputFormat(Recap) },
-    messages: [
-      {
-        role: "user",
-        content: [
+    maxTokens: 2000,
+    effort: "high",
+    content: [{ type: "text", text: [
           `Crew: "${crewName}". The last seven days (${range}), ordered by their overall standing:\n`,
           scoreboard(members),
           `\n\nWrite the week up. One line each, in this order, seven words each.`,
           `Use their names exactly as spelled above.`,
-        ].join("\n"),
-      },
-    ],
+        ].join("\n") }],
   });
 
-  const recap = response.parsed_output;
-  if (!recap) throw new Error("No write-up came back.");
+  const recap = value;
 
   // Names come back as free text, and the order decides who gets the medals.
   const known = new Map(members.map((m, i) => [m.name, i]));

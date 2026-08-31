@@ -1,7 +1,6 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { structured } from "./llm";
 
 export const PlanReview = z.object({
   verdict: z
@@ -109,22 +108,16 @@ export function digestOf(snap: PlanSnapshot): string {
 }
 
 export async function reviewPlan(snap: PlanSnapshot): Promise<PlanReview> {
-  const client = new Anthropic();
-
-  const response = await client.messages.parse({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 4000,
+  const { value } = await structured({
+    task: "plan_review",
+    schema: PlanReview,
+    schemaName: "PlanReview",
     system: SYSTEM,
-    output_config: { effort: "high", format: zodOutputFormat(PlanReview) },
-    messages: [
-      {
-        role: "user",
-        content: `${snapshotText(snap)}\n\nReview this plan. Say what to change, with numbers.`,
-      },
-    ],
+    maxTokens: 4000,
+    effort: "high",
+    content: [{ type: "text", text: `${snapshotText(snap)}\n\nReview this plan. Say what to change, with numbers.` }],
   });
 
-  const review = response.parsed_output;
-  if (!review) throw new Error("No review came back.");
+  const review = value;
   return { ...review, suggestions: review.suggestions.slice(0, 4) };
 }

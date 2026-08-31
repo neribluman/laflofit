@@ -1,7 +1,6 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { structured } from "./llm";
 
 const Intent = z.object({
   kind: z
@@ -63,17 +62,14 @@ export async function readIntent({
   plan: string;
   logged: string;
 }): Promise<Intent> {
-  const client = new Anthropic();
-
-  const response = await client.messages.parse({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 2000,
+  const { value } = await structured({
+    task: "intent",
+    schema: Intent,
+    schemaName: "Intent",
     system: SYSTEM,
-    output_config: { effort: "medium", format: zodOutputFormat(Intent) },
-    messages: [
-      {
-        role: "user",
-        content: [
+    maxTokens: 2000,
+    effort: "medium",
+    content: [{ type: "text", text: [
           `About them: ${person}`,
           ``,
           `Their plan:`,
@@ -86,12 +82,8 @@ export async function readIntent({
           `"""`,
           text,
           `"""`,
-        ].join("\n"),
-      },
-    ],
+        ].join("\n") }],
   });
 
-  const intent = response.parsed_output;
-  if (!intent) throw new Error("No reading came back.");
-  return intent;
+  return value;
 }

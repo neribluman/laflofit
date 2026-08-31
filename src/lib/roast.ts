@@ -1,7 +1,6 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { structured } from "./llm";
 
 export const Roast = z.object({
   verdict: z
@@ -176,32 +175,25 @@ export async function writeRoast(
   crewName: string,
   members: RoastMember[],
 ): Promise<Roast> {
-  const client = new Anthropic();
-
-  const response = await client.messages.parse({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
-    max_tokens: 2000,
+  const { value } = await structured({
+    task: "roast",
+    schema: Roast,
+    schemaName: "Roast",
     system: SYSTEM,
-    // Comedy is the one thing here worth thinking about properly.
-    output_config: { effort: "high", format: zodOutputFormat(Roast) },
-    messages: [
-      {
-        role: "user",
-        content: [
+    maxTokens: 2000,
+    effort: "high",
+    content: [{ type: "text", text: [
           `The crew is called "${crewName}". This week's standings:\n`,
           scoreboard(members),
           `\n\nEight words each, hardest on whoever has done least.`,
           `Use their names exactly as spelled above.`,
-        ].join("\n"),
-      },
-    ],
+        ].join("\n") }],
   });
 
-  const roast = response.parsed_output;
-  if (!roast) throw new Error("No ruling came back.");
 
   // Names come back as free text; anything that isn't a member is dropped
   // rather than rendered against nobody.
   const known = new Set(members.map((m) => m.name));
+  const roast = value;
   return { ...roast, lines: roast.lines.filter((line) => known.has(line.name)) };
 }
