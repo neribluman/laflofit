@@ -43,6 +43,30 @@ const PROVIDERS: Record<string, { base: string; keyVar: string }> = {
   custom: { base: "", keyVar: "LLM_API_KEY" },
 };
 
+/**
+ * What each job runs on unless the environment says otherwise.
+ *
+ * Haiku costs a fraction of Opus and answers in a third of the time, and on
+ * the twelve-message comparison it agreed with Opus 73% of the time with no
+ * failures — its disagreements are portion estimates a few percent apart, not
+ * mistakes. Measured on real messages, one log costs $0.0066 on Haiku against
+ * $0.0555 on Opus.
+ *
+ * The three left on Opus are the ones where cheapness buys nothing. They run
+ * occasionally rather than on every log, so they are already a rounding error
+ * on the bill — and they are the parts people read out to each other or act on
+ * medically, where a slightly worse answer is the whole cost.
+ */
+const DEFAULT_MODEL: Record<Task, string> = {
+  interpret_day: "claude-haiku-4-5",
+  interpret_plate: "claude-haiku-4-5",
+  plan_request: "claude-haiku-4-5",
+  intent: "claude-haiku-4-5",
+  roast: "claude-opus-5",
+  recap: "claude-opus-5",
+  plan_review: "claude-opus-5",
+};
+
 const ENV_FOR: Record<Task, string> = {
   interpret_day: "LLM_INTERPRET_DAY",
   interpret_plate: "LLM_INTERPRET_PLATE",
@@ -67,7 +91,9 @@ export function routeFor(task: Task): Route {
   const fallback = {
     kind: "anthropic" as const,
     provider: "anthropic" as const,
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
+    // ANTHROPIC_MODEL still overrides every job at once, for putting the whole
+    // app on one model to compare.
+    model: process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL[task],
   };
   if (!setting) return fallback;
 
@@ -120,9 +146,24 @@ export async function structured<T extends z.ZodType>(
   call: StructuredCall<T>,
 ): Promise<StructuredResult<z.infer<T>>> {
   const route = routeFor(call.task);
-  return route.kind === "anthropic"
-    ? viaAnthropic(call, route)
-    : viaOpenAICompatible(call, route);
+  const started = Date.now();
+
+  const result =
+    route.kind === "anthropic"
+      ? await viaAnthropic(call, route)
+      : await viaOpenAICompatible(call, route);
+
+  // Set LLM_LOG_USAGE=1 to see what each job actually costs. Guessing at token
+  // counts is how people end up optimising the job that was already cheap.
+  if (process.env.LLM_LOG_USAGE) {
+    const { input = 0, output = 0 } = result.usage ?? {};
+    console.log(
+      `[llm] ${call.task} ${route.provider}/${route.model} ` +
+        `in=${input} out=${output} ${Date.now() - started}ms`,
+    );
+  }
+
+  return result;
 }
 
 async function viaAnthropic<T extends z.ZodType>(
@@ -194,6 +235,14 @@ async function viaOpenAICompatible<T extends z.ZodType>(
   call: StructuredCall<T>,
   route: Extract<Route, { kind: "openai" }>,
 ): Promise<StructuredResult<z.infer<T>>> {
+  // Routers reserve the whole max_tokens against your balance before the model
+  // writes a word, so a generous ceiling can make a request unaffordable that
+  // would have cost a fraction of it. LLM_MAX_TOKENS caps the ask; a reply that
+  // needs more than the cap is truncated, and truncated JSON fails validation
+  // loudly rather than saving half a day.
+  const cap = Number(process.env.LLM_MAX_TOKENS) || 0;
+  const maxTokens = cap > 0 ? Math.min(call.maxTokens, cap) : call.maxTokens;
+
   const jsonSchema = z.toJSONSchema(call.schema, { io: "output" });
 
   const messages: Record<string, unknown>[] = [
@@ -224,7 +273,7 @@ async function viaOpenAICompatible<T extends z.ZodType>(
       },
       body: JSON.stringify({
         model: route.model,
-        max_tokens: call.maxTokens,
+        max_tokens: maxTokens,
         temperature: 0,
         messages,
         response_format: format,
