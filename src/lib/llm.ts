@@ -34,6 +34,9 @@ const PROVIDERS: Record<string, { base: string; keyVar: string }> = {
   deepinfra: { base: "https://api.deepinfra.com/v1/openai", keyVar: "DEEPINFRA_API_KEY" },
   fireworks: { base: "https://api.fireworks.ai/inference/v1", keyVar: "FIREWORKS_API_KEY" },
   cerebras: { base: "https://api.cerebras.ai/v1", keyVar: "CEREBRAS_API_KEY" },
+  // Moonshot's own endpoint, if you'd rather go direct than through a router.
+  moonshot: { base: "https://api.moonshot.ai/v1", keyVar: "MOONSHOT_API_KEY" },
+  deepseek: { base: "https://api.deepseek.com", keyVar: "DEEPSEEK_API_KEY" },
   // Runs on your own machine. No key, and nothing leaves the building.
   ollama: { base: "http://localhost:11434/v1", keyVar: "OLLAMA_API_KEY" },
   // Anything else: set LLM_BASE_URL and LLM_API_KEY.
@@ -68,6 +71,8 @@ export function routeFor(task: Task): Route {
   };
   if (!setting) return fallback;
 
+  // Only the FIRST slash separates provider from model: a router's model ids
+  // carry slashes themselves, as in openrouter/moonshotai/kimi-k2.
   const slash = setting.indexOf("/");
   if (slash < 0) return { ...fallback, model: setting };
 
@@ -209,6 +214,13 @@ async function viaOpenAICompatible<T extends z.ZodType>(
       headers: {
         "Content-Type": "application/json",
         ...(route.key ? { Authorization: `Bearer ${route.key}` } : {}),
+        // OpenRouter asks for these; they identify the app on its dashboards.
+        ...(route.provider === "openrouter"
+          ? {
+              "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "https://laflofit.laflo.pro",
+              "X-Title": "LaFloFit",
+            }
+          : {}),
       },
       body: JSON.stringify({
         model: route.model,
@@ -216,6 +228,12 @@ async function viaOpenAICompatible<T extends z.ZodType>(
         temperature: 0,
         messages,
         response_format: format,
+        // A router picks an upstream host for you, and they don't all support
+        // schema-constrained output. This says: only use one that does, rather
+        // than silently landing on one that ignores the schema.
+        ...(route.provider === "openrouter" && format.type === "json_schema"
+          ? { provider: { require_parameters: true } }
+          : {}),
       }),
     });
     if (!response.ok) {

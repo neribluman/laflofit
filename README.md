@@ -148,6 +148,60 @@ being careful with.
 
 ---
 
+## Using a cheaper model
+
+Every model call goes through `src/lib/llm.ts`, and each job can be pointed at
+a different model. Set nothing and everything uses Claude, exactly as before.
+
+The easiest way in is **OpenRouter**: one account, one key, and most open
+models — Kimi, DeepSeek, Qwen, Llama, GLM — behind a single endpoint, so you
+don't sign up with each provider separately.
+
+1. openrouter.ai → sign in → **Keys** → create one. Add a few dollars of
+   credit; these models cost a fraction of a cent per message.
+2. Put it in `.env.local`:
+   ```
+   OPENROUTER_API_KEY=sk-or-v1-...
+   ```
+3. Check the model actually works for this app, before wiring it into
+   anything:
+   ```bash
+   npx tsx --conditions=react-server scripts/try-model.mts openrouter/moonshotai/kimi-k2
+   ```
+   It sends one realistic message and prints what came back, or why it failed.
+4. See where it disagrees with the model you trust:
+   ```bash
+   npx tsx --conditions=react-server scripts/compare-models.mts \
+     anthropic/claude-opus-5 openrouter/moonshotai/kimi-k2
+   ```
+5. Happy with it? Give it a job, in `.env.local` and in Vercel:
+   ```
+   LLM_INTENT=openrouter/moonshotai/kimi-k2
+   ```
+
+### Which job to give it
+
+Not all seven are equally forgiving:
+
+| Job | Variable | Move it? |
+|---|---|---|
+| Log or question? (WhatsApp) | `LLM_INTENT` | Yes — easiest job in the app |
+| Build a plan from a description | `LLM_PLAN_REQUEST` | Fine — runs once per person |
+| The ruling / the weekly write-up | `LLM_ROAST`, `LLM_RECAP` | Try it — cheap models are less funny |
+| Free text into food and training | `LLM_INTERPRET_DAY` | Last. A wrong number here is written down and stays |
+| Reading a plate photograph | `LLM_INTERPRET_PLATE` | No — vision is where open models are weakest |
+| Reviewing someone's plan | `LLM_PLAN_REVIEW` | No — health-adjacent advice |
+
+Model ids keep their own slashes: only the first one separates the provider,
+so `openrouter/moonshotai/kimi-k2` means provider `openrouter`, model
+`moonshotai/kimi-k2`.
+
+Other providers work the same way — `groq/`, `together/`, `fireworks/`,
+`deepinfra/`, `cerebras/`, `moonshot/`, `deepseek/`, or `ollama/` for a model
+running on your own machine with no key and nothing leaving the building.
+
+---
+
 ## Logging over WhatsApp
 
 Optional. When it's set up, everyone gets a number they can text — "3 eggs and
