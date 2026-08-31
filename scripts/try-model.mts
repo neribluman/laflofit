@@ -96,7 +96,11 @@ try {
   console.log(`  \x1b[31mIt didn't work.\x1b[0m  ${Date.now() - started}ms\n`);
   console.log(`  ${message.slice(0, 500)}\n`);
 
-  const hint = /401|403|invalid.*key|unauthor/i.test(message)
+  const hint = /402|more credits|afford/i.test(message)
+    ? "Out of credit. OpenRouter reserves the whole max_tokens up front, so a job\n  asking for 8,000 needs that much affordable even if it uses far less. Top up."
+    : /No endpoints found that can handle/i.test(message)
+      ? "No host behind that model can do schema-constrained output, which this app\n  needs. Pick a newer variant — moonshotai/kimi-k2 can't, moonshotai/kimi-k3 can."
+    : /401|403|invalid.*key|unauthor/i.test(message)
     ? "That reads like the API key. Check it's the right one and has credit."
     : /404|not.*found|no.*model|unknown model/i.test(message)
       ? "That reads like the model id. Copy it exactly from the provider's model list."
