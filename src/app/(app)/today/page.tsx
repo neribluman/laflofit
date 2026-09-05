@@ -20,6 +20,7 @@ import {
 } from "@/lib/dates";
 import { currentStreak, scoreDay } from "@/lib/scoring";
 import { canInterpret } from "@/lib/interpret";
+import { transcriberConfigured } from "@/lib/transcribe";
 import { distanceUnit, fmtWeight, weightUnit } from "@/lib/units";
 import ScoreRing from "@/components/ScoreRing";
 import DayStrip, { type StripDay, type PeriodTotals } from "@/components/DayStrip";
@@ -245,6 +246,7 @@ export default async function TodayPage({
         <div className="space-y-6">
           {canInterpret() && (
             <NaturalLog
+              canSpeak={transcriberConfigured()}
               key={`log-${date}`}
               date={date}
               weightUnit={weightUnit(user.units)}

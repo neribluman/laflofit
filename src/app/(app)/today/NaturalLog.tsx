@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { logDay, logPlate, undoLog, type LogResult, type LogReceipt } from "./actions";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { logDay, logPlate, logVoice, undoLog, type LogResult, type LogReceipt } from "./actions";
 import { shrinkImage } from "@/lib/image";
 import type { DayReport } from "@/lib/interpret";
 import { macroTotals } from "@/lib/macros";
@@ -11,7 +11,23 @@ import { describeExercise } from "@/lib/exercise-format";
 const EXAMPLE =
   "Two eggs and black coffee at 7, chicken caesar for lunch, beans and steak for dinner. Caved and had a slice of bread. 3L water. Squats 5x5 at 100kg then bench 3x8 at 70. 84.1kg this morning.";
 
-type Saved = { report: DayReport; labels: Record<string, string>; receipt: LogReceipt };
+type Saved = {
+  report: DayReport;
+  labels: Record<string, string>;
+  receipt: LogReceipt;
+  /** What the transcriber heard, when this came in by voice. */
+  heard?: string;
+};
+
+/** Whatever this browser will actually give us; Safari and Chrome differ. */
+function pickAudioType(): string {
+  for (const type of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"]) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return "";
+}
 
 export default function NaturalLog({
   date,
@@ -19,6 +35,7 @@ export default function NaturalLog({
   distanceUnit,
   prominent = false,
   fallbackHref,
+  canSpeak = false,
 }: {
   date: string;
   weightUnit: string;
@@ -27,6 +44,8 @@ export default function NaturalLog({
   prominent?: boolean;
   /** Shown under the box while composing, and hidden once there's a result. */
   fallbackHref?: string;
+  /** Whether a transcription key is configured on the server. */
+  canSpeak?: boolean;
 }) {
   const [text, setText] = useState("");
   const [saved, setSaved] = useState<Saved | null>(null);
@@ -34,10 +53,33 @@ export default function NaturalLog({
   const [undone, setUndone] = useState(false);
   const [working, startWorking] = useTransition();
   const [undoing, startUndoing] = useTransition();
+  const [recording, setRecording] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const recorder = useRef<MediaRecorder | null>(null);
 
-  const handle = (result: LogResult, spentText: boolean) => {
+  // Releasing the microphone matters: the browser shows a recording indicator
+  // for as long as the track is live, and leaving one on after navigating away
+  // looks exactly like an app listening to you.
+  useEffect(() => {
+    return () => {
+      recorder.current?.stream.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recording) return;
+    const tick = setInterval(() => setSeconds((n) => n + 1), 1000);
+    return () => clearInterval(tick);
+  }, [recording]);
+
+  const handle = (result: LogResult & { heard?: string }, spentText: boolean) => {
     if (result.ok) {
-      setSaved({ report: result.report, labels: result.labels, receipt: result.receipt });
+      setSaved({
+        report: result.report,
+        labels: result.labels,
+        receipt: result.receipt,
+        heard: result.heard,
+      });
       setError(null);
       setUndone(false);
       if (spentText) setText("");
@@ -71,6 +113,52 @@ export default function NaturalLog({
     });
   };
 
+  const startRecording = async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const type = pickAudioType();
+      const media = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      const chunks: Blob[] = [];
+
+      media.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      media.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(chunks, { type: media.mimeType || "audio/webm" });
+        setRecording(false);
+        setSeconds(0);
+        if (blob.size < 1200) {
+          setError("That was too short to hear. Hold it while you talk.");
+          return;
+        }
+        startWorking(async () => {
+          try {
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve, reject) => {
+              reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            });
+            handle(await logVoice(date, base64, blob.type), false);
+          } catch {
+            setError("Couldn't send that recording. Try again.");
+          }
+        });
+      };
+
+      recorder.current = media;
+      media.start();
+      setSeconds(0);
+      setRecording(true);
+    } catch {
+      setError("I can't reach the microphone. Check the permission for this site.");
+    }
+  };
+
+  const stopRecording = () => recorder.current?.stop();
+
   const undo = () => {
     if (!saved) return;
     startUndoing(async () => {
@@ -100,6 +188,11 @@ export default function NaturalLog({
               {undoing ? "Undoing…" : "Undo"}
             </button>
           </div>
+          {saved.heard && (
+            <p className="mt-2 text-xs text-muted">
+              Heard: <span className="italic">&ldquo;{saved.heard}&rdquo;</span>
+            </p>
+          )}
           <Summary
             report={saved.report}
             labels={saved.labels}
@@ -148,7 +241,9 @@ export default function NaturalLog({
 
       {working && (
         <div className="mt-3 space-y-2" aria-live="polite">
-          <p className="text-sm text-muted">Reading it and adding it…</p>
+          <p className="text-sm text-muted">
+            {recording ? "Listening…" : "Reading it and adding it…"}
+          </p>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -167,6 +262,32 @@ export default function NaturalLog({
         >
           {working ? "Adding…" : "Add to my day"}
         </button>
+        {canSpeak && (
+          <button
+            type="button"
+            onClick={recording ? stopRecording : startRecording}
+            disabled={working}
+            aria-label={recording ? "Stop recording" : "Say it instead"}
+            title={recording ? "Stop and log it" : "Say it instead"}
+            className={`shrink-0 px-3 ${recording ? "btn-primary" : "btn-ghost"}`}
+          >
+            {recording ? (
+              <span className="nums flex items-center gap-1.5 text-sm font-semibold">
+                <span
+                  aria-hidden
+                  className="h-2.5 w-2.5 animate-pulse rounded-full bg-current"
+                />
+                {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+              </span>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0014 0M12 18v3" />
+              </svg>
+            )}
+          </button>
+        )}
+
         <label
           aria-label="Photograph your plate"
           title="Photograph your plate"

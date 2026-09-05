@@ -15,6 +15,12 @@ const nextConfig: NextConfig = {
     // Mirrored so server code (the session cookie) can scope itself to match.
     NEXT_PUBLIC_BASE_PATH: basePath ?? "",
   },
+  experimental: {
+    // Voice notes arrive through a server action, and the default 1MB ceiling
+    // cuts off at roughly two minutes of speech — which is a silent failure,
+    // since the recording looks fine right up until it doesn't send.
+    serverActions: { bodySizeLimit: "8mb" },
+  },
 };
 
 export default nextConfig;

@@ -148,6 +148,34 @@ being careful with.
 
 ---
 
+## Saying your day instead of typing it
+
+Optional. With a key set, a microphone button appears next to the log box:
+hold a thought, tap stop, and what you said goes in as if you'd typed it.
+
+This is the one job that can't be Claude — Anthropic has no transcription API.
+
+**Groq** is the pick. Its `whisper-large-v3-turbo` costs **$0.04 per hour of
+audio** — about a ninth of what OpenAI charges for the same model — and runs at
+roughly 228x real time, which matters when someone is standing in a kitchen
+waiting for it. At this crew's rate, every log being spoken would come to about
+12p a month.
+
+1. console.groq.com → sign in → **API Keys** → create one. The free tier is
+   enough for a crew this size.
+2. Add `GROQ_API_KEY=gsk_...` to `.env.local` and to Vercel.
+3. Redeploy. The button appears on its own.
+
+`OPENAI_API_KEY` (whisper-1) and `DEEPGRAM_API_KEY` (nova-3) work as
+alternatives without any code change — whichever key exists is used, and
+`STT_PROVIDER` forces one when several are set.
+
+The transcript is shown back to you on the receipt — "Heard: …" — because
+mishearing is the one failure typing doesn't have, and you can only catch it if
+you're shown the words. Undo is there as usual.
+
+---
+
 ## Using a cheaper model
 
 Every model call goes through `src/lib/llm.ts`, and each job can be pointed at

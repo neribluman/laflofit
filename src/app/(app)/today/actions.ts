@@ -13,6 +13,7 @@ import {
   type ReadResult,
 } from "@/lib/log";
 import type { User } from "@/lib/types";
+import { transcribe, transcriberConfigured, VOCABULARY } from "@/lib/transcribe";
 
 export type { LogReceipt, LogResult, ReadResult };
 
@@ -138,4 +139,52 @@ export async function undoLog(receipt: LogReceipt) {
   revalidatePath("/today");
   revalidatePath("/me");
   revalidatePath("/crew");
+}
+
+export type VoiceResult = LogResult & { heard?: string };
+
+/**
+ * Say it instead of typing it.
+ *
+ * The transcript goes through exactly the same path as typed text — there is
+ * no separate "voice" understanding, and there shouldn't be. What comes back
+ * includes what was heard, because the one new failure here is mishearing, and
+ * you can only spot that if you're shown the words.
+ */
+export async function logVoice(
+  date: string,
+  audioBase64: string,
+  mimeType: string,
+): Promise<VoiceResult> {
+  await requireUser();
+  if (!transcriberConfigured()) {
+    return { ok: false, error: "Voice isn't set up for this app yet." };
+  }
+
+  // ~10MB of base64 is around 7MB of audio: minutes of speech, far past what
+  // anyone dictates into a food log.
+  if (audioBase64.length > 10_000_000) {
+    return { ok: false, error: "That recording is too long. Try a shorter one." };
+  }
+
+  let heard: string;
+  try {
+    const bytes = Buffer.from(audioBase64, "base64");
+    const type = /^audio\/[\w.+-]+$/.test(mimeType) ? mimeType : "audio/webm";
+    const extension = type.includes("mp4") || type.includes("mp4a") ? "m4a"
+      : type.includes("ogg") ? "ogg"
+      : type.includes("wav") ? "wav"
+      : "webm";
+    heard = await transcribe(new Blob([bytes], { type }), `day.${extension}`, VOCABULARY);
+  } catch (error) {
+    console.error("transcription failed", error);
+    return { ok: false, error: "Couldn't make out the audio. Try again, or type it." };
+  }
+
+  if (heard.trim().length < 3) {
+    return { ok: false, error: "I didn't catch anything. Try again closer to the mic." };
+  }
+
+  const result = await logDay(date, heard);
+  return { ...result, heard };
 }
