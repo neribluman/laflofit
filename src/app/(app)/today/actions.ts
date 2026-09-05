@@ -178,7 +178,17 @@ export async function logVoice(
     heard = await transcribe(new Blob([bytes], { type }), `day.${extension}`, VOCABULARY);
   } catch (error) {
     console.error("transcription failed", error);
-    return { ok: false, error: "Couldn't make out the audio. Try again, or type it." };
+    // Telling someone their speech was unclear when the real problem is an
+    // expired key or an empty account sends them back to re-record, over and
+    // over, fixing something that was never broken.
+    const message = String(error);
+    const ours = /401|403|invalid.?api.?key|credit|quota|billing|429|5\d\d/i.test(message);
+    return {
+      ok: false,
+      error: ours
+        ? "Voice isn't working right now — that's our end, not your recording. Type it for now."
+        : "Couldn't make out the audio. Try again, or type it.",
+    };
   }
 
   if (heard.trim().length < 3) {
