@@ -163,6 +163,11 @@ waiting for it. At this crew's rate, every log being spoken would come to about
 
 1. console.groq.com → sign in → **API Keys** → create one. The free tier is
    enough for a crew this size.
+
+   Note the spelling. **Groq** (console.groq.com) runs open models on its own
+   chips and hosts Whisper. **Grok** is xAI's chatbot and has no transcription
+   endpoint at all — `/v1/audio/transcriptions` there returns a 404. One letter
+   apart, different companies.
 2. Add `GROQ_API_KEY=gsk_...` to `.env.local` and to Vercel.
 3. Redeploy. The button appears on its own.
 
@@ -173,6 +178,20 @@ alternatives without any code change — whichever key exists is used, and
 The transcript is shown back to you on the receipt — "Heard: …" — because
 mishearing is the one failure typing doesn't have, and you can only catch it if
 you're shown the words. Undo is there as usual.
+
+### The vocabulary prompt earns its place
+
+`VOCABULARY` in `src/lib/transcribe.ts` is handed to the transcriber as a
+prompt. Measured on the same recording, with and without:
+
+| | Transcript |
+|---|---|
+| with it | `squats 5x5 at 155 lbs ... bench 3x8 at 70 kg` |
+| without | `squats 5 by 5 at 155 pounds ... bench 3 by 8 at 70 kilos` |
+
+It also gets "ashtanga" and "picanha" right, which a general model turns into
+"ash tonga" and "pick on ya". Keep it short if you edit it — a long prompt
+becomes context rather than a dictionary and starts to hurt.
 
 ---
 
