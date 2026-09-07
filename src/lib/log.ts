@@ -44,7 +44,13 @@ function macroForRule(rule: PlanRule): keyof ReturnType<typeof macroTotals> | nu
 }
 
 export type ReadResult =
-  | { ok: true; report: DayReport; labels: Record<string, string> }
+  | {
+      ok: true;
+      report: DayReport;
+      labels: Record<string, string>;
+      /** The plan this was read against, so saving needn't fetch it again. */
+      rules: PlanRule[];
+    }
   | { ok: false; error: string };
 
 /**
@@ -104,6 +110,7 @@ export async function readDayFor(user: User, date: string, text: string): Promis
       ok: true,
       report,
       labels: Object.fromEntries(planned.rules.map((r) => [r.id, r.label])),
+      rules: planned.rules,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Something went wrong.";
@@ -147,6 +154,7 @@ export async function readPlateFor(
       ok: true,
       report,
       labels: Object.fromEntries(planned.rules.map((r) => [r.id, r.label])),
+      rules: planned.rules,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Something went wrong.";
@@ -165,10 +173,13 @@ export async function applyReportFor(
   user: User,
   date: string,
   report: DayReport,
+  /** Passed in when the caller already has it: reading the plan a second time
+   *  is two more round trips for something that cannot have changed since. */
+  loaded?: { rules: PlanRule[] } | null,
 ): Promise<LogReceipt | null> {
   if (!user.active_plan_id) return null;
 
-  const planned = await planWithRules(user.active_plan_id);
+  const planned = loaded ?? (await planWithRules(user.active_plan_id));
   if (!planned) return null;
   // Never trust the ids that came back through the browser.
   const known = new Map(planned.rules.map((rule) => [rule.id, rule]));
@@ -191,20 +202,28 @@ export async function applyReportFor(
     noteSet: false,
   };
 
-  for (const meal of report.meals.slice(0, 30)) {
-    if (!meal.description?.trim()) continue;
-    const saved = await sqlOne<{ id: string }>`
+  // One statement for the lot. Each of these was its own round trip, so a
+  // six-item dinner cost six of them — the difference between a save that
+  // feels instant and one you sit through.
+  const items = report.meals.slice(0, 30).filter((m) => m.description?.trim());
+  if (items.length > 0) {
+    const saved = await sql<{ id: string }>`
       insert into meals
         (user_id, meal_date, description, slot, calories, protein_g, carbs_g, fat_g, fibre_g, estimated)
-      values (
-        ${user.id}, ${date}::date, ${meal.description.trim().slice(0, 200)},
-        ${meal.slot}, ${round(meal.calories)}, ${round(meal.protein_g)},
-        ${round(meal.carbs_g)}, ${round(meal.fat_g)}, ${round(meal.fibre_g)},
-        ${meal.estimated !== false}
-      )
+      select ${user.id}::uuid, ${date}::date, d, s, c, p, cb, f, fi, e
+      from unnest(
+        ${items.map((m) => m.description.trim().slice(0, 200))}::text[],
+        ${items.map((m) => m.slot)}::text[],
+        ${items.map((m) => round(m.calories))}::int[],
+        ${items.map((m) => round(m.protein_g))}::int[],
+        ${items.map((m) => round(m.carbs_g))}::int[],
+        ${items.map((m) => round(m.fat_g))}::int[],
+        ${items.map((m) => round(m.fibre_g))}::int[],
+        ${items.map((m) => m.estimated !== false)}::bool[]
+      ) as t(d, s, c, p, cb, f, fi, e)
       returning id
     `;
-    if (saved) receipt.mealIds.push(saved.id);
+    receipt.mealIds.push(...saved.map((row) => row.id));
   }
 
   // A plan with a calorie or protein rule should get it filled from the food
@@ -218,14 +237,23 @@ export async function applyReportFor(
     return [{ rule_id: rule.id, met: null, value: totals[macro], evidence: "" }];
   });
 
-  for (const entry of [...report.rules, ...autoFilled]) {
-    const rule = known.get(entry.rule_id);
-    if (!rule) continue;
-
-    const prior = await sqlOne<{ checked: boolean | null; value: number | null }>`
-      select checked, value::float8 as value from rule_entries
-      where day_log_id = ${log.id} and rule_id = ${rule.id}
+  // Reading each tick's old value before overwriting it — which is what makes
+  // Undo able to restore rather than just delete — used to cost a round trip
+  // per rule. All of them at once costs one, and so does writing them back.
+  const entries = [...report.rules, ...autoFilled].filter((e) => known.has(e.rule_id));
+  const priors = new Map<string, { checked: boolean | null; value: number | null }>();
+  if (entries.length > 0) {
+    const rows = await sql<{ rule_id: string; checked: boolean | null; value: number | null }>`
+      select rule_id, checked, value::float8 as value from rule_entries
+      where day_log_id = ${log.id} and rule_id = any(${entries.map((e) => e.rule_id)}::uuid[])
     `;
+    for (const row of rows) priors.set(row.rule_id, row);
+  }
+
+  const ticks: { ruleId: string; checked: boolean | null; value: number | null }[] = [];
+  for (const entry of entries) {
+    const rule = known.get(entry.rule_id)!;
+    const prior = priors.get(rule.id);
     receipt.rules.push({
       ruleId: rule.id,
       existed: Boolean(prior),
@@ -235,19 +263,28 @@ export async function applyReportFor(
 
     if (rule.kind === "count") {
       if (entry.value == null || !Number.isFinite(entry.value)) continue;
-      await sql`
-        insert into rule_entries (day_log_id, rule_id, value)
-        values (${log.id}, ${rule.id}, ${entry.value})
-        on conflict (day_log_id, rule_id) do update set value = excluded.value
-      `;
+      ticks.push({ ruleId: rule.id, checked: null, value: entry.value });
     } else {
       if (typeof entry.met !== "boolean") continue;
-      await sql`
-        insert into rule_entries (day_log_id, rule_id, checked)
-        values (${log.id}, ${rule.id}, ${entry.met})
-        on conflict (day_log_id, rule_id) do update set checked = excluded.checked
-      `;
+      ticks.push({ ruleId: rule.id, checked: entry.met, value: null });
     }
+  }
+
+  if (ticks.length > 0) {
+    // coalesce on conflict, so writing a count rule's value can't blank a
+    // checkbox already set on that same row, or the other way round.
+    await sql`
+      insert into rule_entries (day_log_id, rule_id, checked, value)
+      select ${log.id}::uuid, r, c, v
+      from unnest(
+        ${ticks.map((t) => t.ruleId)}::uuid[],
+        ${ticks.map((t) => t.checked)}::bool[],
+        ${ticks.map((t) => t.value)}::float8[]
+      ) as t(r, c, v)
+      on conflict (day_log_id, rule_id) do update
+        set checked = coalesce(excluded.checked, rule_entries.checked),
+            value   = coalesce(excluded.value, rule_entries.value)
+    `;
   }
 
   for (const workout of report.workouts.slice(0, 5)) {
@@ -265,28 +302,30 @@ export async function applyReportFor(
     if (!session) continue;
     receipt.workoutIds.push(session.id);
 
-    for (const [i, exercise] of (workout.exercises ?? []).slice(0, 30).entries()) {
-      if (!exercise.name?.trim()) continue;
+    const moves = (workout.exercises ?? []).slice(0, 30).filter((e) => e.name?.trim());
+    if (moves.length > 0) {
       await sql`
         insert into exercises
           (workout_id, name, sets, reps, weight_kg, distance_km, minutes, notes, sort_order)
-        values (
-          ${session.id}, ${exercise.name.trim().slice(0, 80)},
-          ${clamp(exercise.sets, 50)}, ${clamp(exercise.reps, 1000)},
-          ${
-            positive(exercise.weight) == null
+        select ${session.id}::uuid, n, st, rp, w, d, mn, nt, ord
+        from unnest(
+          ${moves.map((e) => e.name.trim().slice(0, 80))}::text[],
+          ${moves.map((e) => clamp(e.sets, 50))}::int[],
+          ${moves.map((e) => clamp(e.reps, 1000))}::int[],
+          ${moves.map((e) =>
+            positive(e.weight) == null
               ? null
-              : statedToKg(exercise.weight!, exercise.weight_unit ?? null, user.units)
-          },
-          ${
-            positive(exercise.distance) == null
+              : statedToKg(e.weight!, e.weight_unit ?? null, user.units),
+          )}::float8[],
+          ${moves.map((e) =>
+            positive(e.distance) == null
               ? null
-              : statedToKm(exercise.distance!, exercise.distance_unit ?? null, user.units)
-          },
-          ${clamp(exercise.minutes, 600)},
-          ${exercise.notes?.slice(0, 200) ?? null},
-          ${i}
-        )
+              : statedToKm(e.distance!, e.distance_unit ?? null, user.units),
+          )}::float8[],
+          ${moves.map((e) => clamp(e.minutes, 600))}::int[],
+          ${moves.map((e) => e.notes?.slice(0, 200) ?? null)}::text[],
+          ${moves.map((_, i) => i)}::int[]
+        ) as t(n, st, rp, w, d, mn, nt, ord)
       `;
     }
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { whoIsChasing } from "@/app/(app)/chase-action";
 
 export type Chaser = {
   id: string;
@@ -33,7 +34,8 @@ export type Chaser = {
  * which is thirty lines and no kilobytes. Motion is 46KB gzipped and earns
  * that on layout animations and gestures, neither of which is happening here.
  */
-export default function LeaderChase({ leader }: { leader: Chaser }) {
+export default function LeaderChase() {
+  const [leader, setLeader] = useState<Chaser | null>(null);
   const [gone, setGone] = useState(true);
   const [caught, setCaught] = useState(false);
   const [corner, setCorner] = useState(false);
@@ -46,23 +48,30 @@ export default function LeaderChase({ leader }: { leader: Chaser }) {
     // On the next frame rather than during the effect: the page paints once
     // without this, which is right for a decoration, and it keeps the state
     // change out of the render that mounted it.
-    const id = requestAnimationFrame(() => {
-      // ?chase=1 forces it on, so it can be looked at by whoever is leading
-      // and shown to someone across a table.
-      const asked = new URLSearchParams(window.location.search).has("chase");
-      if (leader.preview && !asked) return;
+    // ?chase=1 forces it on, so it can be looked at by whoever is leading
+    // and shown to someone across a table.
+    const asked = new URLSearchParams(window.location.search).has("chase");
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      if (!asked && localStorage.getItem("laflofit:chase-dismissed") === today) return;
+    } catch {
+      // Private windows throw on access; a joke is not worth an error.
+    }
 
-      const today = new Date().toISOString().slice(0, 10);
-      try {
-        if (!asked && localStorage.getItem("laflofit:chase-dismissed") === today) return;
-      } catch {
-        // Private windows throw on access; a joke is not worth an error.
-      }
-      setStill(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-      setGone(false);
-    });
-    return () => cancelAnimationFrame(id);
-  }, [leader.preview]);
+    let live = true;
+    whoIsChasing()
+      .then((found) => {
+        if (!live || !found) return;
+        if (found.preview && !asked) return;
+        setLeader(found);
+        setStill(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+        setGone(false);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (gone || still) return;
@@ -141,7 +150,7 @@ export default function LeaderChase({ leader }: { leader: Chaser }) {
     setGone(true);
   };
 
-  if (gone) return null;
+  if (gone || !leader) return null;
 
   return (
     <div

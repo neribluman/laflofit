@@ -15,8 +15,6 @@ type Saved = {
   report: DayReport;
   labels: Record<string, string>;
   receipt: LogReceipt;
-  /** What the transcriber heard, when this came in by voice. */
-  heard?: string;
 };
 
 /** Whatever this browser will actually give us; Safari and Chrome differ. */
@@ -72,13 +70,12 @@ export default function NaturalLog({
     return () => clearInterval(tick);
   }, [recording]);
 
-  const handle = (result: LogResult & { heard?: string }, spentText: boolean) => {
+  const handle = (result: LogResult, spentText: boolean) => {
     if (result.ok) {
       setSaved({
         report: result.report,
         labels: result.labels,
         receipt: result.receipt,
-        heard: result.heard,
       });
       setError(null);
       setUndone(false);
@@ -141,7 +138,18 @@ export default function NaturalLog({
               reader.onerror = () => reject(reader.error);
               reader.readAsDataURL(blob);
             });
-            handle(await logVoice(date, base64, blob.type), false);
+            const result = await logVoice(date, base64, blob.type);
+            if (!result.ok) {
+              setError(result.error);
+              return;
+            }
+            // Into the box, not into the diary. Read it, fix the word it got
+            // wrong, then press the same button you always press.
+            setText((existing) =>
+              existing.trim() ? `${existing.trim()} ${result.heard}` : result.heard,
+            );
+            setSaved(null);
+            setUndone(false);
           } catch {
             setError("Couldn't send that recording. Try again.");
           }
@@ -188,11 +196,6 @@ export default function NaturalLog({
               {undoing ? "Undoing…" : "Undo"}
             </button>
           </div>
-          {saved.heard && (
-            <p className="mt-2 text-xs text-muted">
-              Heard: <span className="italic">&ldquo;{saved.heard}&rdquo;</span>
-            </p>
-          )}
           <Summary
             report={saved.report}
             labels={saved.labels}
@@ -242,7 +245,7 @@ export default function NaturalLog({
       {working && (
         <div className="mt-3 space-y-2" aria-live="polite">
           <p className="text-sm text-muted">
-            {recording ? "Listening…" : "Reading it and adding it…"}
+            {recording ? "Listening…" : "Writing down what you said…"}
           </p>
           {[0, 1, 2].map((i) => (
             <div

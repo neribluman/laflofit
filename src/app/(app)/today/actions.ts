@@ -50,7 +50,7 @@ export async function logDay(date: string, text: string): Promise<LogResult> {
     };
   }
 
-  const receipt = await applyReportFor(user, date, read.report);
+  const receipt = await applyReportFor(user, date, read.report, { rules: read.rules });
   if (!receipt) return { ok: false, error: "Couldn't save that. Try again." };
 
   return { ok: true, report: read.report, labels: read.labels, receipt };
@@ -68,7 +68,7 @@ export async function logPlate(
     return { ok: false, error: "Couldn't make out any food there. Try another photo." };
   }
 
-  const receipt = await applyReportFor(user, date, read.report);
+  const receipt = await applyReportFor(user, date, read.report, { rules: read.rules });
   if (!receipt) return { ok: false, error: "Couldn't save that. Try again." };
 
   return { ok: true, report: read.report, labels: read.labels, receipt };
@@ -141,18 +141,18 @@ export async function undoLog(receipt: LogReceipt) {
   revalidatePath("/crew");
 }
 
-export type VoiceResult = LogResult & { heard?: string };
+export type VoiceResult = { ok: true; heard: string } | { ok: false; error: string };
 
 /**
  * Say it instead of typing it.
  *
- * The transcript goes through exactly the same path as typed text — there is
- * no separate "voice" understanding, and there shouldn't be. What comes back
- * includes what was heard, because the one new failure here is mishearing, and
- * you can only spot that if you're shown the words.
+ * It stops at the words. Speech gets misheard in ways typing never is — a
+ * name, a number, a unit — and logging straight from it means the mistake is
+ * already in the diary by the time you read it. So the transcript lands in
+ * the box, where it can be corrected, and the same button saves it as always.
  */
 export async function logVoice(
-  date: string,
+  _date: string,
   audioBase64: string,
   mimeType: string,
 ): Promise<VoiceResult> {
@@ -195,6 +195,5 @@ export async function logVoice(
     return { ok: false, error: "I didn't catch anything. Try again closer to the mic." };
   }
 
-  const result = await logDay(date, heard);
-  return { ...result, heard };
+  return { ok: true, heard };
 }
