@@ -9,6 +9,8 @@ export type Chaser = {
   hasAvatar: boolean;
   /** How far ahead they are, already phrased. */
   lead: string;
+  /** True when there is no real reason to chase — shown only on request. */
+  preview: boolean;
 };
 
 /**
@@ -45,9 +47,14 @@ export default function LeaderChase({ leader }: { leader: Chaser }) {
     // without this, which is right for a decoration, and it keeps the state
     // change out of the render that mounted it.
     const id = requestAnimationFrame(() => {
+      // ?chase=1 forces it on, so it can be looked at by whoever is leading
+      // and shown to someone across a table.
+      const asked = new URLSearchParams(window.location.search).has("chase");
+      if (leader.preview && !asked) return;
+
       const today = new Date().toISOString().slice(0, 10);
       try {
-        if (localStorage.getItem("laflofit:chase-dismissed") === today) return;
+        if (!asked && localStorage.getItem("laflofit:chase-dismissed") === today) return;
       } catch {
         // Private windows throw on access; a joke is not worth an error.
       }
@@ -55,7 +62,7 @@ export default function LeaderChase({ leader }: { leader: Chaser }) {
       setGone(false);
     });
     return () => cancelAnimationFrame(id);
-  }, []);
+  }, [leader.preview]);
 
   useEffect(() => {
     if (gone || still) return;
@@ -191,7 +198,9 @@ export default function LeaderChase({ leader }: { leader: Chaser }) {
               <>
                 <span className="font-semibold">{leader.name}</span> is {leader.lead}.
                 <span className="mt-0.5 block text-muted">
-                  Tap again and they&apos;ll leave you alone until tomorrow.
+                  {leader.preview
+                    ? "Preview — this is what the others see. It won't show on its own."
+                    : "Tap again and they'll leave you alone until tomorrow."}
                 </span>
               </>
             )}

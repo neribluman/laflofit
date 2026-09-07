@@ -27,6 +27,10 @@ export async function leaderChase(
   meId: string,
   today: string,
 ): Promise<Chaser | null> {
+  // Note: when nothing qualifies, this still returns a face marked `preview`.
+  // The leader is otherwise the one person who can never see their own
+  // feature, and "trust me, it works" is not a way to build something whose
+  // entire point is how it feels.
   const roster = await crewRoster(crewId);
   if (roster.length < 2) return null;
 
@@ -42,7 +46,6 @@ export async function leaderChase(
   const loggedToday =
     logs.some((log) => log.user_id === meId && log.log_date === today) ||
     workouts.some((workout) => workout.user_id === meId);
-  if (loggedToday) return null;
 
   const planIds = [
     ...new Set(
@@ -88,9 +91,24 @@ export async function leaderChase(
   const mine = standings.find((row) => row.member.id === meId);
   const best = [...standings].sort((a, b) => b.standing.points - a.standing.points)[0];
 
-  if (!mine || !best || best.member.id === meId) return null;
-  if (best.standing.points <= 0) return null;
-  if (best.standing.points <= mine.standing.points) return null;
+  const preview = (why: string): Chaser | null => {
+    const face = best ?? mine;
+    if (!face) return null;
+    return {
+      id: face.member.id,
+      name: face.member.display_name,
+      emoji: face.member.emoji,
+      hasAvatar: face.member.has_avatar,
+      lead: why,
+      preview: true,
+    };
+  };
+
+  if (loggedToday) return preview("you've logged today, so they leave you alone");
+  if (!mine || !best) return preview("nobody has scored anything yet");
+  if (best.member.id === meId) return preview("you're the one they're all chasing");
+  if (best.standing.points <= 0) return preview("nobody has scored anything yet");
+  if (best.standing.points <= mine.standing.points) return preview("you're level at the top");
 
   // Clean days, the same unit the Plan board uses, so the taunt and the
   // leaderboard can't tell different stories.
@@ -106,5 +124,6 @@ export async function leaderChase(
     emoji: best.member.emoji,
     hasAvatar: best.member.has_avatar,
     lead,
+    preview: false,
   };
 }
