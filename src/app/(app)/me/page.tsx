@@ -343,6 +343,47 @@ export default async function MePage() {
       </section>
 
       <section>
+        <h2 className="label">Your data</h2>
+        <div className="card divide-y divide-line">
+          {[
+            {
+              format: "days",
+              title: "A row per day",
+              hint: "Opens in Excel or Sheets. Calories, protein, training, weight, score — the one to make a chart from.",
+            },
+            {
+              format: "items",
+              title: "A row per thing",
+              hint: "Every meal, session, lift and weigh-in, with the numbers behind each day.",
+            },
+            {
+              format: "json",
+              title: "Everything, as JSON",
+              hint: "The complete record including your plan and notes. A backup, or the input to somewhere else.",
+            },
+          ].map((option) => (
+            <a
+              key={option.format}
+              href={`/api/export?format=${option.format}`}
+              download
+              className="flex items-center gap-3 p-4 hover:bg-surface-2"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{option.title}</span>
+                <span className="block text-xs text-muted">{option.hint}</span>
+              </span>
+              <span aria-hidden className="shrink-0 text-muted">
+                ↓
+              </span>
+            </a>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Yours only — the file never contains anyone else&apos;s logs.
+        </p>
+      </section>
+
+      <section>
         <h2 className="label">Settings</h2>
         <form action={updateProfile} className="card space-y-4 p-4">
           <div>
