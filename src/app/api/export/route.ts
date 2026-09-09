@@ -4,13 +4,15 @@ import { exportFor, type Format } from "@/lib/export";
 /** A long history is a lot of rows to assemble, though not a lot of bytes. */
 export const maxDuration = 60;
 
-const FORMATS: Format[] = ["days", "items", "json"];
+const FORMATS: Format[] = ["days", "items", "json", "crew"];
 
 /**
  * Your own history, as a file.
  *
  * Session-scoped and takes no user id: there is no parameter here that could
- * be edited to fetch somebody else's diary.
+ * be edited to fetch somebody else's diary. The crew format is scoped the same
+ * way — to the crew the session belongs to — so it can't be pointed at one you
+ * are not in.
  */
 export async function GET(request: Request) {
   const user = await currentUser();

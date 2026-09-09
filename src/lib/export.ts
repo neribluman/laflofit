@@ -7,12 +7,13 @@ import {
   measurementsFor,
   rulesForPlans,
   workoutsBetween,
+  crewRoster,
 } from "./data";
 import { scoreDay } from "./scoring";
 import { kgToDisplay, kmToDisplay, weightUnit, distanceUnit } from "./units";
 import type { PlanRule, User } from "./types";
 
-export type Format = "days" | "items" | "json";
+export type Format = "days" | "items" | "json" | "crew";
 
 /**
  * Everything one person has logged, in three shapes.
@@ -26,7 +27,11 @@ export type Format = "days" | "items" | "json";
  *   the daily numbers, for anyone who wants to check the workings.
  * - `json` — the lot, nested and lossless, for a backup or moving elsewhere.
  *
- * Only ever the person asking. Crew data belongs to the crew.
+ * `crew` is the fourth: everyone's daily numbers side by side, for a shared
+ * spreadsheet. It holds nothing the crew page doesn't already show each
+ * member — the leaderboard has been comparing their calories, protein and
+ * weight all along — but a file travels further than a screen, so it is its
+ * own deliberate choice rather than a variant of the personal ones.
  */
 
 /**
@@ -77,6 +82,8 @@ export async function exportFor(
   user: User,
   format: Format,
 ): Promise<{ body: string; filename: string; type: string }> {
+  if (format === "crew") return crewExport(user);
+
   const all = await gather(user);
   const stamp = new Date().toISOString().slice(0, 10);
   const who = user.display_name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -290,5 +297,129 @@ function jsonShape(user: User, all: Everything) {
       body_fat: m.body_fat, waist_cm: grams(m.waist_cm), resting_hr: m.resting_hr,
       notes: m.notes,
     })),
+  };
+}
+
+/**
+ * Everyone's days in one sheet, for comparing.
+ *
+ * Weights convert to the units of whoever asked, not each member's own — a
+ * column silently mixing kilos and pounds is worse than no column, and it's
+ * the sort of thing nobody notices until a chart looks mad.
+ */
+async function crewExport(
+  user: User,
+): Promise<{ body: string; filename: string; type: string }> {
+  const roster = await crewRoster(user.crew_id);
+  const ids = roster.map((m) => m.id);
+  const from = "1970-01-01";
+  const to = "2999-12-31";
+
+  const [logs, meals, workouts, measurements] = await Promise.all([
+    dayLogsBetween(ids, from, to),
+    mealsBetween(ids, from, to),
+    workoutsBetween(ids, from, to),
+    measurementsFor(ids),
+  ]);
+  const [entries, rules] = await Promise.all([
+    entriesForLogs(logs.map((l) => l.id)),
+    rulesForPlans([
+      ...new Set(
+        [...roster.map((m) => m.active_plan_id), ...logs.map((l) => l.plan_id)].filter(
+          (v): v is string => Boolean(v),
+        ),
+      ),
+    ]),
+  ]);
+
+  const rulesByPlan = new Map<string, PlanRule[]>();
+  for (const rule of rules) {
+    rulesByPlan.set(rule.plan_id, [...(rulesByPlan.get(rule.plan_id) ?? []), rule]);
+  }
+  const entriesByLog = new Map<string, typeof entries>();
+  for (const entry of entries) {
+    entriesByLog.set(entry.day_log_id, [
+      ...(entriesByLog.get(entry.day_log_id) ?? []),
+      entry,
+    ]);
+  }
+
+  const w = weightUnit(user.units);
+  const header = [
+    "person", "date", "weekday", "logged", "plan_percent",
+    "calories", "protein_g", "carbs_g", "fat_g", "fibre_g", "items",
+    "sessions", "training", "training_minutes", `weight_${w}`, "note",
+  ];
+  const body: unknown[][] = [];
+
+  for (const member of roster) {
+    const dates = [
+      ...new Set([
+        ...logs.filter((l) => l.user_id === member.id).map((l) => l.log_date),
+        ...meals.filter((m) => m.user_id === member.id).map((m) => m.meal_date),
+        ...workouts.filter((x) => x.user_id === member.id).map((x) => x.workout_date),
+        ...measurements
+          .filter((m) => m.user_id === member.id && m.weight_kg != null)
+          .map((m) => m.measured_on),
+      ]),
+    ];
+
+    for (const date of dates) {
+      const log = logs.find((l) => l.user_id === member.id && l.log_date === date);
+      const theirMeals = meals.filter(
+        (m) => m.user_id === member.id && m.meal_date === date,
+      );
+      const sessions = workouts.filter(
+        (x) => x.user_id === member.id && x.workout_date === date,
+      );
+      const weigh = measurements.find(
+        (m) => m.user_id === member.id && m.measured_on === date && m.weight_kg != null,
+      );
+      const score = log
+        ? scoreDay(
+            rulesByPlan.get(log.plan_id ?? member.active_plan_id ?? "") ?? [],
+            entriesByLog.get(log.id) ?? [],
+            true,
+          )
+        : null;
+      const sum = (pick: (m: (typeof theirMeals)[number]) => number | null) =>
+        theirMeals.reduce((total, meal) => total + (pick(meal) ?? 0), 0);
+
+      body.push([
+        member.display_name,
+        date,
+        new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
+          weekday: "short",
+          timeZone: "UTC",
+        }),
+        log ? "yes" : "no",
+        score ? Math.round(score.ratio * 100) : "",
+        theirMeals.length ? sum((m) => m.calories) : "",
+        theirMeals.length ? sum((m) => m.protein_g) : "",
+        theirMeals.length ? sum((m) => m.carbs_g) : "",
+        theirMeals.length ? sum((m) => m.fat_g) : "",
+        theirMeals.length ? sum((m) => m.fibre_g) : "",
+        theirMeals.length,
+        sessions.length,
+        sessions.map((x) => x.kind).join(" + "),
+        sessions.reduce((total, x) => total + (x.minutes ?? 0), 0) || "",
+        weigh?.weight_kg != null ? kgToDisplay(weigh.weight_kg, user.units).toFixed(1) : "",
+        log?.note ?? "",
+      ]);
+    }
+  }
+
+  // Grouped by date, then name: a shared sheet should read as "here is Tuesday
+  // for everyone", not one person's whole history followed by the next.
+  body.sort(
+    (a, b) =>
+      String(a[1]).localeCompare(String(b[1])) ||
+      String(a[0]).localeCompare(String(b[0])),
+  );
+
+  return {
+    body: toCsv([header, ...body]),
+    filename: `laflofit-crew-${new Date().toISOString().slice(0, 10)}.csv`,
+    type: "text/csv; charset=utf-8",
   };
 }

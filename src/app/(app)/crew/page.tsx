@@ -602,6 +602,32 @@ export default async function CrewPage({
       {/* Last: inviting someone is a once-in-a-while errand, and it was
           sitting above the things people open this tab for. */}
       <InviteCode code={crew.invite_code} crewName={crew.name} />
+
+      <section>
+        <h2 className="label">The crew&apos;s numbers</h2>
+        <a
+          href="/api/export?format=crew"
+          download
+          className="card flex items-center gap-3 p-4 hover:border-muted"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">
+              Download as a spreadsheet
+            </span>
+            <span className="block text-xs text-muted">
+              Everyone&apos;s days in one file — calories, protein, training and
+              weight, a row per person per day. Opens in Excel or Sheets.
+            </span>
+          </span>
+          <span aria-hidden className="shrink-0 text-muted">
+            ↓
+          </span>
+        </a>
+        <p className="mt-2 text-xs text-muted">
+          Same numbers the boards above already show each other, in a file that
+          travels. Your own history alone is on the Me tab.
+        </p>
+      </section>
     </main>
   );
 }
