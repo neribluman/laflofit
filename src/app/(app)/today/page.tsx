@@ -172,7 +172,7 @@ export default async function TodayPage({
   // — counting it meant everybody's first day opened fully expanded.
   // Only for today: offering yesterday's usuals while editing last Tuesday
   // would add food to the wrong day, which is worse than not offering them.
-  const usuals = date === today ? await usualsFor(user.id, today, user.timezone) : [];
+  const usuals = date === today ? await usualsFor(user.id, today, user.timezone, 6) : [];
 
   const hasContent =
     meals.length > 0 ||

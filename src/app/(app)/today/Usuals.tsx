@@ -7,9 +7,11 @@ import type { Usual } from "@/lib/usuals";
 /**
  * The things you eat all the time, one tap away.
  *
- * A row of chips rather than a list, because this is meant to be glanced at
- * and skipped past on the way to the box — it's a shortcut, not a menu, and
- * anything taller would push the thing people came here for off the screen.
+ * Chips in two columns rather than a scrolling row. The row bled 16px past
+ * each edge to hint that it scrolled, and nothing clipped it, so on a phone
+ * the whole page scrolled sideways — measured at 497px against a 375px
+ * screen. Wrapping instead fits, but six chips stack 244px tall and shove the
+ * log box off the fold. An even grid is 118px and ends exactly at the margin.
  *
  * Ordering is done on the server and is mostly the clock: your breakfast at
  * breakfast time. Nobody wants last night's steak offered at seven in the
@@ -49,22 +51,23 @@ export default function Usuals({
     <div>
       <p className="label mb-2">Your usuals</p>
 
-      {/* Scrolls sideways rather than wrapping: a fixed one-line height means
-          the box below never moves as the list changes through the day. */}
-      <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {usuals.map((usual) => {
           const done = added.includes(usual.key);
           const working = busy === usual.key;
 
           return (
-            <li key={usual.key} className="shrink-0">
+            // min-w-0 is load-bearing: a grid item defaults to min-width
+            // auto, so text set not to wrap simply refuses to shrink and
+            // pushes the column past the screen edge.
+            <li key={usual.key} className="min-w-0">
               <button
                 onClick={() => tap(usual)}
                 disabled={working}
                 aria-label={`Add ${usual.label}${
                   usual.calories != null ? `, ${usual.calories} calories` : ""
                 }`}
-                className={`flex max-w-[15rem] items-center gap-2 rounded-full border px-3 py-2 text-left transition ${
+                className={`flex w-full items-center gap-2 rounded-full border px-3 py-2 text-left transition ${
                   done
                     ? "border-accent/50 bg-accent/10"
                     : "border-line bg-surface hover:border-muted"
@@ -77,7 +80,7 @@ export default function Usuals({
                   <span className="block truncate text-xs font-medium">
                     {usual.label}
                   </span>
-                  <span className="nums block text-[11px] text-muted">
+                  <span className="nums block truncate text-[11px] text-muted">
                     {usual.calories != null ? `${usual.calories} kcal` : "no numbers"}
                     {usual.protein_g ? ` · ${usual.protein_g}g P` : ""}
                     {usual.loggedToday ? " · had today" : ""}
