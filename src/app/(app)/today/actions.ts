@@ -13,6 +13,7 @@ import {
   type ReadResult,
 } from "@/lib/log";
 import type { User } from "@/lib/types";
+import { usualByKey } from "@/lib/usuals";
 import { transcribe, transcriberConfigured, VOCABULARY } from "@/lib/transcribe";
 
 export type { LogReceipt, LogResult, ReadResult };
@@ -196,4 +197,33 @@ export async function logVoice(
   }
 
   return { ok: true, heard };
+}
+
+/**
+ * Add one of your usuals to a day, in one tap.
+ *
+ * Takes the key and nothing else: the numbers are looked up server-side from
+ * that person's own history, so a tap can't post calories of its own choosing.
+ */
+export async function addUsual(
+  date: string,
+  key: string,
+): Promise<{ ok: true; label: string } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const usual = await usualByKey(user.id, date, user.timezone, key);
+  if (!usual) return { ok: false, error: "That one's no longer in your usuals." };
+
+  await sql`
+    insert into meals
+      (user_id, meal_date, description, slot, calories, protein_g, carbs_g, fat_g, fibre_g, estimated)
+    values (
+      ${user.id}, ${date}::date, ${usual.label}, ${usual.slot},
+      ${usual.calories}, ${usual.protein_g}, ${usual.carbs_g},
+      ${usual.fat_g}, ${usual.fibre_g}, true
+    )
+  `;
+
+  revalidatePath("/today");
+  revalidatePath("/crew");
+  return { ok: true, label: usual.label };
 }

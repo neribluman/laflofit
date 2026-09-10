@@ -21,6 +21,8 @@ import {
 import { currentStreak, scoreDay } from "@/lib/scoring";
 import { canInterpret } from "@/lib/interpret";
 import { transcriberConfigured } from "@/lib/transcribe";
+import { usualsFor } from "@/lib/usuals";
+import Usuals from "./Usuals";
 import { distanceUnit, fmtWeight, weightUnit } from "@/lib/units";
 import ScoreRing from "@/components/ScoreRing";
 import DayStrip, { type StripDay, type PeriodTotals } from "@/components/DayStrip";
@@ -168,6 +170,10 @@ export default async function TodayPage({
   // A weigh-in deliberately does not count. Mentioning your weight at sign-up
   // records one for today, and that is not the same as having logged your day
   // — counting it meant everybody's first day opened fully expanded.
+  // Only for today: offering yesterday's usuals while editing last Tuesday
+  // would add food to the wrong day, which is worse than not offering them.
+  const usuals = date === today ? await usualsFor(user.id, today, user.timezone) : [];
+
   const hasContent =
     meals.length > 0 ||
     workouts.length > 0 ||
@@ -244,6 +250,8 @@ export default async function TodayPage({
         }
       >
         <div className="space-y-6">
+          {usuals.length > 0 && <Usuals date={date} usuals={usuals} />}
+
           {canInterpret() && (
             <NaturalLog
               canSpeak={transcriberConfigured()}
